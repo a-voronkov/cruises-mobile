@@ -119,6 +119,12 @@ app.*.symbols
 models/
 !models/.gitkeep
 
+# llama.cpp build artifacts
+build/llama.cpp/
+*.xcframework
+ios/Frameworks/llama.xcframework/
+android/app/src/main/jniLibs/*/libllama.so
+
 # Code generation
 *.g.dart
 *.freezed.dart

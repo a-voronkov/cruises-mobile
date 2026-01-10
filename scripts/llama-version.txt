@@ -1,0 +1,16 @@
+# llama.cpp version/commit to use for building native libraries
+# Update this to rebuild libraries in CI/CD
+# Format: git commit hash or tag
+
+# Using master branch commit from 2026-01-09
+# This ensures we get the latest stable version with LFM2.5 support
+b4313
+
+# Alternative: use a specific tag
+# v1.0.0
+
+# To update:
+# 1. Change the commit hash/tag above
+# 2. Commit this file
+# 3. CI/CD will automatically rebuild libraries with new version
+

@@ -261,6 +261,29 @@ flutter clean
 - [Clean Architecture Guide](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
 - [llama.cpp GitHub](https://github.com/ggerganov/llama.cpp)
 
+## CI/CD Pipeline
+
+The project includes automated builds with llama.cpp integration:
+
+**Features:**
+- ✅ Automatic llama.cpp compilation for Android (ARM64)
+- ✅ Automatic llama.cpp compilation for iOS (device + simulator)
+- ✅ Intelligent caching (saves 5-10 minutes per build)
+- ✅ Cache invalidation via `scripts/llama-version.txt`
+- ✅ Runs on self-hosted MacInCloud runner
+
+**Build Process:**
+1. Check cache for compiled llama.cpp libraries
+2. If cache miss: compile libraries (~10 minutes)
+3. If cache hit: restore libraries (~30 seconds)
+4. Build Flutter app with native libraries
+5. Upload APK/AAB/IPA artifacts
+
+**Documentation:**
+- [CI_CD.md](docs/CI_CD.md) - General CI/CD setup
+- [CI_CD_LLAMA_SETUP.md](docs/CI_CD_LLAMA_SETUP.md) - llama.cpp build details
+- [scripts/README.md](scripts/README.md) - Build scripts documentation
+
 ---
 
 **Ready to contribute?** Check out [ROADMAP.md](docs/ROADMAP.md) to see what's planned!

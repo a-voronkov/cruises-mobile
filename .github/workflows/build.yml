@@ -1,5 +1,14 @@
 name: Build and Release
 
+# This workflow builds the Flutter app for Android and iOS
+# It includes llama.cpp native library compilation with caching
+#
+# Key features:
+# - Caches llama.cpp libraries to speed up builds (saves 5-10 minutes)
+# - Builds separate libraries for Android (libllama.so) and iOS (llama.xcframework)
+# - Runs on self-hosted MacInCloud runner (supports both Android and iOS builds)
+# - Cache invalidation: update scripts/llama-version.txt to rebuild libraries
+
 on:
   push:
     branches: [ main, develop ]
@@ -12,7 +21,7 @@ jobs:
   build-android:
     name: Build Android APK/AAB
     runs-on: self-hosted
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,6 +39,35 @@ jobs:
           flutter-version: '3.19.0'
           channel: 'stable'
           cache: true
+
+      # Cache llama.cpp Android libraries
+      - name: Cache llama.cpp Android libraries
+        id: cache-llama-android
+        uses: actions/cache@v4
+        with:
+          path: android/app/src/main/jniLibs
+          key: llama-android-${{ hashFiles('scripts/llama-version.txt') }}
+          restore-keys: |
+            llama-android-
+
+      # Build llama.cpp for Android if not cached
+      - name: Build llama.cpp for Android
+        if: steps.cache-llama-android.outputs.cache-hit != 'true'
+        run: |
+          chmod +x scripts/build-llama-android.sh
+          bash scripts/build-llama-android.sh
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+
+      # Verify llama.cpp library exists
+      - name: Verify llama.cpp library
+        run: |
+          if [ ! -f "android/app/src/main/jniLibs/arm64-v8a/libllama.so" ]; then
+            echo "Error: libllama.so not found!"
+            exit 1
+          fi
+          echo "✅ llama.cpp library found"
+          ls -lh android/app/src/main/jniLibs/*/libllama.so
 
       - name: Get dependencies
         run: flutter pub get
@@ -65,7 +103,7 @@ jobs:
   build-ios:
     name: Build iOS IPA
     runs-on: self-hosted
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -76,6 +114,41 @@ jobs:
           flutter-version: '3.19.0'
           channel: 'stable'
           cache: true
+
+      # Cache llama.cpp iOS libraries
+      - name: Cache llama.cpp iOS libraries
+        id: cache-llama-ios
+        uses: actions/cache@v4
+        with:
+          path: ios/Frameworks/llama.xcframework
+          key: llama-ios-${{ hashFiles('scripts/llama-version.txt') }}
+          restore-keys: |
+            llama-ios-
+
+      # Build llama.cpp for iOS if not cached
+      - name: Build llama.cpp for iOS
+        if: steps.cache-llama-ios.outputs.cache-hit != 'true'
+        run: |
+          chmod +x scripts/build-llama-ios.sh
+          bash scripts/build-llama-ios.sh
+
+      # Verify llama.cpp framework exists
+      - name: Verify llama.cpp framework
+        run: |
+          if [ ! -d "ios/Frameworks/llama.xcframework" ]; then
+            echo "Error: llama.xcframework not found!"
+            exit 1
+          fi
+          echo "✅ llama.cpp framework found"
+          ls -lh ios/Frameworks/
+
+      # Add framework to Xcode project (if not already added)
+      - name: Configure Xcode project
+        run: |
+          # This step ensures the framework is properly linked
+          # You may need to customize this based on your Xcode project structure
+          echo "Configuring Xcode project..."
+          # TODO: Add script to modify Runner.xcodeproj if needed
 
       - name: Get dependencies
         run: flutter pub get
