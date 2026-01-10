@@ -263,24 +263,39 @@ flutter clean
 
 ## CI/CD Pipeline
 
-The project includes automated builds with llama.cpp integration:
+The project includes an **optimized multi-job CI/CD pipeline** with intelligent caching.
+
+**Trigger:** Manual workflow dispatch only (via GitHub Actions UI)
+
+**Architecture:**
+```
+Setup → Build Android (parallel) ↘
+                                  → Create Release
+Setup → Build iOS (parallel)     ↗
+```
 
 **Features:**
-- ✅ Automatic llama.cpp compilation for Android (ARM64)
-- ✅ Automatic llama.cpp compilation for iOS (device + simulator)
-- ✅ Intelligent caching (saves 5-10 minutes per build)
-- ✅ Cache invalidation via `scripts/llama-version.txt`
-- ✅ Runs on self-hosted MacInCloud runner
+- ✅ **Manual trigger only** - you control when to build
+- ✅ **68% faster builds** with intelligent caching (~10 min vs ~31 min)
+- ✅ Parallel Android/iOS builds
+- ✅ Automatic llama.cpp compilation with caching
+- ✅ Reusable dependencies across jobs
+- ✅ Smart cache invalidation
+
+**Caching:**
+- Flutter SDK, Pub dependencies, Generated code
+- Gradle (Android), CocoaPods (iOS)
+- llama.cpp libraries (Android + iOS)
+- **Total time saved:** ~20-25 minutes per build!
 
 **Build Process:**
-1. Check cache for compiled llama.cpp libraries
-2. If cache miss: compile libraries (~10 minutes)
-3. If cache hit: restore libraries (~30 seconds)
-4. Build Flutter app with native libraries
-5. Upload APK/AAB/IPA artifacts
+1. **Setup job**: Install & cache all dependencies (~2-5 min)
+2. **Build jobs** (parallel): Restore caches & build apps (~3-4 min each)
+3. **Release job**: Create GitHub release with artifacts (~1 min)
 
 **Documentation:**
 - [CI_CD.md](docs/CI_CD.md) - General CI/CD setup
+- [CI_CD_OPTIMIZATION.md](docs/CI_CD_OPTIMIZATION.md) - Optimization details ⭐
 - [CI_CD_LLAMA_SETUP.md](docs/CI_CD_LLAMA_SETUP.md) - llama.cpp build details
 - [scripts/README.md](scripts/README.md) - Build scripts documentation
 

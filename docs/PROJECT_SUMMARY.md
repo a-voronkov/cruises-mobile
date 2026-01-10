@@ -10,12 +10,13 @@
 To provide travelers with an intelligent, privacy-focused mobile assistant for planning cruise vacations and travel itineraries, powered by on-device AI.
 
 ### Key Features
-- 🤖 **Local AI Processing**: HY-MT1.5-1.8B-GGUF model runs entirely on-device
+- 🤖 **Local AI Processing**: LiquidAI LFM2.5-1.2B-Instruct model runs entirely on-device
 - 💬 **ChatGPT-like Interface**: Modern, intuitive chat UI with light/dark themes
 - 🎤 **Voice Input**: Speech-to-text for hands-free interaction
 - 📸 **Media Support**: Send photos and files from device
 - 🌐 **Offline-First**: Full functionality without internet (after model download)
 - 🎨 **Modern Design**: Material Design 3 with ChatGPT-inspired aesthetics
+- ⚡ **Fast Inference**: 82 tok/s on mobile NPU, 239 tok/s on AMD CPU
 
 ## Technical Stack
 
@@ -96,16 +97,20 @@ cruises-mobile/
 ## LLM Integration
 
 ### Model Specifications
-- **Model**: HY-MT1.5-1.8B-GGUF
+- **Model**: LiquidAI LFM2.5-1.2B-Instruct
+- **Parameters**: 1.17 billion
 - **Quantization**: Q4_K_M (4-bit, medium quality)
-- **Size**: ~1.2 GB
+- **Size**: ~700 MB
 - **Format**: GGUF (GPT-Generated Unified Format)
+- **Context Length**: 32,768 tokens
+- **Languages**: 8 (EN, AR, ZH, FR, DE, JA, KO, ES)
 
 ### Integration Approach
-1. **Download**: Model downloaded from server on first launch
-2. **Storage**: Stored in app documents directory
-3. **Loading**: Loaded into memory using llama.cpp
+1. **Download**: Model downloaded manually or on first launch
+2. **Storage**: Stored in app documents directory or models/ folder
+3. **Loading**: Loaded into memory using llama.cpp via llama_cpp_dart
 4. **Inference**: Processes prompts locally with streaming responses
+5. **Chat Template**: ChatML format with special tokens
 
 ### Performance Considerations
 - Context length: 4096 tokens
