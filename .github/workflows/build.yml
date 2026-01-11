@@ -240,6 +240,49 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
           echo "ANDROID_NDK=$ANDROID_SDK_ROOT/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
 
+      # Ensure Android resources exist (mipmap, styles, etc.)
+      - name: Ensure Android project resources exist
+        run: |
+          # Check if required Android resources are missing
+          if [ ! -d "android/app/src/main/res" ]; then
+            echo "⚠️  Android resources missing (res directory). Regenerating via flutter create..."
+
+            PROJECT_NAME="$(awk -F': *' '/^name:/{print $2; exit}' pubspec.yaml)"
+            if [ -z "$PROJECT_NAME" ]; then
+              PROJECT_NAME="cruises_mobile"
+            fi
+
+            # Preserve existing files
+            if [ -f "android/app/build.gradle" ]; then
+              cp "android/app/build.gradle" "$RUNNER_TEMP/android_app_build.gradle.bak"
+            fi
+            if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
+              cp "android/app/src/main/AndroidManifest.xml" "$RUNNER_TEMP/AndroidManifest.xml.bak"
+            fi
+
+            # Generate Android project files
+            flutter create --platforms=android --project-name "$PROJECT_NAME" . || true
+
+            # Restore preserved files if they had customizations
+            # (Actually, for resources we want the new ones, so don't restore res)
+
+            echo "✅ Android resources generated"
+          fi
+
+          # Verify resources exist
+          if [ ! -d "android/app/src/main/res/mipmap-hdpi" ]; then
+            echo "❌ Android mipmap resources still missing"
+            ls -la android/app/src/main/ || true
+            exit 1
+          fi
+          if [ ! -f "android/app/src/main/res/values/styles.xml" ]; then
+            echo "❌ Android styles.xml still missing"
+            ls -la android/app/src/main/res/ || true
+            exit 1
+          fi
+          echo "✅ Android resources verified"
+          ls -la android/app/src/main/res/
+
       - name: Ensure CMake available (required by llama.cpp build scripts)
         run: |
           if command -v cmake >/dev/null 2>&1; then
