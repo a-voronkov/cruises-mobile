@@ -252,19 +252,39 @@ jobs:
               PROJECT_NAME="cruises_mobile"
             fi
 
-            # Preserve existing files
+            # Preserve existing files that flutter create might overwrite
             if [ -f "android/app/build.gradle" ]; then
               cp "android/app/build.gradle" "$RUNNER_TEMP/android_app_build.gradle.bak"
             fi
             if [ -f "android/app/src/main/AndroidManifest.xml" ]; then
               cp "android/app/src/main/AndroidManifest.xml" "$RUNNER_TEMP/AndroidManifest.xml.bak"
             fi
+            if [ -f "android/gradle/wrapper/gradle-wrapper.properties" ]; then
+              cp "android/gradle/wrapper/gradle-wrapper.properties" "$RUNNER_TEMP/gradle-wrapper.properties.bak"
+            fi
+            if [ -f "android/build.gradle" ]; then
+              cp "android/build.gradle" "$RUNNER_TEMP/android_build.gradle.bak"
+            fi
+            if [ -f "android/settings.gradle" ]; then
+              cp "android/settings.gradle" "$RUNNER_TEMP/android_settings.gradle.bak"
+            fi
 
             # Generate Android project files
             flutter create --platforms=android --project-name "$PROJECT_NAME" . || true
 
-            # Restore preserved files if they had customizations
-            # (Actually, for resources we want the new ones, so don't restore res)
+            # Restore preserved gradle files (flutter create may downgrade Gradle version)
+            if [ -f "$RUNNER_TEMP/gradle-wrapper.properties.bak" ]; then
+              cp "$RUNNER_TEMP/gradle-wrapper.properties.bak" "android/gradle/wrapper/gradle-wrapper.properties"
+              echo "✅ Restored gradle-wrapper.properties"
+            fi
+            if [ -f "$RUNNER_TEMP/android_build.gradle.bak" ]; then
+              cp "$RUNNER_TEMP/android_build.gradle.bak" "android/build.gradle"
+              echo "✅ Restored android/build.gradle"
+            fi
+            if [ -f "$RUNNER_TEMP/android_settings.gradle.bak" ]; then
+              cp "$RUNNER_TEMP/android_settings.gradle.bak" "android/settings.gradle"
+              echo "✅ Restored android/settings.gradle"
+            fi
 
             echo "✅ Android resources generated"
           fi
