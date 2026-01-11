@@ -127,9 +127,21 @@ echo ""
 echo "Creating XCFramework..."
 mkdir -p "$OUTPUT_DIR"
 
+IOS_LIB="$BUILD_DIR_IOS/src/libllama.a"
+SIM_LIB="$BUILD_DIR_SIM/src/libllama.a"
+
+if [ ! -f "$IOS_LIB" ]; then
+    echo "error: the path does not point to a valid library: $IOS_LIB"
+    exit 70
+fi
+if [ ! -f "$SIM_LIB" ]; then
+    echo "error: the path does not point to a valid library: $SIM_LIB"
+    exit 70
+fi
+
 xcodebuild -create-xcframework \
-    -library "$BUILD_DIR_IOS/libllama.a" \
-    -library "$BUILD_DIR_SIM/libllama.a" \
+    -library "$IOS_LIB" \
+    -library "$SIM_LIB" \
     -output "$OUTPUT_DIR/llama.xcframework"
 
 # Also copy Metal shader library if it exists
