@@ -279,14 +279,13 @@ jobs:
     needs: setup
 
     # ruby/setup-ruby expects a writable toolcache directory.
-    # On self-hosted macOS runners the hosted default (/Users/runner/hostedtoolcache) may not exist.
-    # Put toolcache next to the runner's _work directory: <runner_root>/_toolcache.
-    env:
 
-      # `runner.workspace` is not a supported context; derive runner_root from `github.workspace`.
-      # github.workspace = <runner_root>/_work/<repo>/<repo>
-      RUNNER_TOOL_CACHE: ${{ github.workspace }}/../../../_toolcache
-      AGENT_TOOLSDIRECTORY: ${{ github.workspace }}/../../../_toolcache
+    # On self-hosted macOS runners the hosted default (/Users/runner/hostedtoolcache) may not exist.
+    # NOTE: ruby/setup-ruby prebuilt Rubies are built for the default toolcache path on macOS
+    # (/Users/runner/hostedtoolcache) and cannot be relocated.
+    env:
+      RUNNER_TOOL_CACHE: /Users/runner/hostedtoolcache
+      AGENT_TOOLSDIRECTORY: /Users/runner/hostedtoolcache
 
     steps:
       - name: Checkout code
@@ -366,7 +365,29 @@ jobs:
         run: |
           echo "RUNNER_TOOL_CACHE=$RUNNER_TOOL_CACHE"
           echo "AGENT_TOOLSDIRECTORY=$AGENT_TOOLSDIRECTORY"
-          mkdir -p "$RUNNER_TOOL_CACHE"
+          TOOLCACHE="$RUNNER_TOOL_CACHE"
+
+          if [ -d "$TOOLCACHE" ] && [ -w "$TOOLCACHE" ]; then
+            echo "✅ Toolcache is writable: $TOOLCACHE"
+            exit 0
+          fi
+
+          echo "⚠️  Toolcache is missing or not writable: $TOOLCACHE"
+          echo "Attempting to create it (requires sudo on most self-hosted runners)..."
+
+          if command -v sudo >/dev/null 2>&1; then
+            sudo mkdir -p "$TOOLCACHE"
+            sudo chown -R "$(id -un)":"$(id -gn)" /Users/runner
+          else
+            echo "❌ sudo is not available. Please create $TOOLCACHE and make it writable for the runner user."
+            exit 1
+          fi
+
+          if [ ! -w "$TOOLCACHE" ]; then
+            echo "❌ Toolcache is still not writable after attempting to fix permissions: $TOOLCACHE"
+            exit 1
+          fi
+          echo "✅ Toolcache prepared: $TOOLCACHE"
 
       - name: Setup Ruby (for CocoaPods)
         if: steps.detect_pod.outputs.present != 'true'
