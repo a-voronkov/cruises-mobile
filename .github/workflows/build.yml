@@ -559,6 +559,23 @@ jobs:
             exit 1
           fi
 
+      # Precache iOS artifacts (required before pod install)
+      - name: Flutter precache iOS
+        run: |
+          # pod install requires Flutter.xcframework to exist.
+          # flutter precache --ios downloads and extracts it.
+          echo "Running flutter precache --ios..."
+          flutter precache --ios
+          # Verify the framework exists
+          if [ -d "$HOME/flutter/bin/cache/artifacts/engine/ios/Flutter.xcframework" ]; then
+            echo "✅ Flutter.xcframework found"
+          else
+            # Try alternative location
+            FLUTTER_ROOT="$(dirname "$(dirname "$(which flutter)")")"
+            echo "Flutter root: $FLUTTER_ROOT"
+            ls -la "$FLUTTER_ROOT/bin/cache/artifacts/engine/ios/" || true
+          fi
+
       # Install CocoaPods dependencies
       - name: Install CocoaPods dependencies
         run: |
