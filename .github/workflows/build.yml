@@ -281,6 +281,7 @@ jobs:
 
       # The llama_cpp_dart package from pub.dev does NOT include the llama.cpp submodule.
       # We need to clone it into the pub-cache directory for the native CMake build to work.
+      # CMakeLists.txt is in src/ directory, so llama.cpp must be at src/llama.cpp
       - name: Clone llama.cpp into llama_cpp_dart package
         run: |
           # Read version from our version file
@@ -297,8 +298,9 @@ jobs:
           fi
           echo "Found llama_cpp_dart at: $LLAMA_PKG_DIR"
 
-          # Clone llama.cpp into the android subdirectory of the package
-          LLAMA_CPP_DIR="$LLAMA_PKG_DIR/android/llama.cpp"
+          # Clone llama.cpp into the src subdirectory of the package
+          # (CMakeLists.txt is in src/ and references ./llama.cpp relative to itself)
+          LLAMA_CPP_DIR="$LLAMA_PKG_DIR/src/llama.cpp"
           if [ ! -d "$LLAMA_CPP_DIR" ]; then
             echo "Cloning llama.cpp into $LLAMA_CPP_DIR..."
             git clone --depth 1 --branch "$LLAMA_VERSION" https://github.com/ggml-org/llama.cpp "$LLAMA_CPP_DIR" || \
@@ -364,10 +366,10 @@ jobs:
           retention-days: 30
 
   ################################################################################
-  # BUILD iOS - Build IPA with cached dependencies
+  # BUILD iOS - Build APP with cached dependencies
   ################################################################################
   build-ios:
-    name: Build iOS IPA
+    name: Build iOS APP
     runs-on: self-hosted
     needs: setup
 
@@ -510,6 +512,7 @@ jobs:
 
       # The llama_cpp_dart package from pub.dev does NOT include the llama.cpp submodule.
       # We need to clone it into the pub-cache directory for the native build to work.
+      # CMakeLists.txt is in src/ directory, so llama.cpp must be at src/llama.cpp
       - name: Clone llama.cpp into llama_cpp_dart package
         run: |
           # Read version from our version file
@@ -526,9 +529,9 @@ jobs:
           fi
           echo "Found llama_cpp_dart at: $LLAMA_PKG_DIR"
 
-          # Clone llama.cpp into the package (for both ios and android builds)
-          # The CMakeLists.txt references ./llama.cpp from the android/ directory
-          LLAMA_CPP_DIR="$LLAMA_PKG_DIR/android/llama.cpp"
+          # Clone llama.cpp into the src subdirectory of the package
+          # (CMakeLists.txt is in src/ and references ./llama.cpp relative to itself)
+          LLAMA_CPP_DIR="$LLAMA_PKG_DIR/src/llama.cpp"
           if [ ! -d "$LLAMA_CPP_DIR" ]; then
             echo "Cloning llama.cpp into $LLAMA_CPP_DIR..."
             git clone --depth 1 --branch "$LLAMA_VERSION" https://github.com/ggml-org/llama.cpp "$LLAMA_CPP_DIR" || \
