@@ -63,7 +63,12 @@ cd "$LLAMA_DIR"
 
 # Checkout specific version
 echo "Checking out version: $LLAMA_VERSION"
-git fetch origin
+git fetch --tags origin
+if ! git rev-parse --verify --quiet "$LLAMA_VERSION^{commit}" >/dev/null; then
+    echo "Error: llama.cpp ref '$LLAMA_VERSION' was not found after fetch."
+    echo "Update scripts/llama-version.txt to a valid tag/commit hash from ggml-org/llama.cpp."
+    exit 1
+fi
 git checkout "$LLAMA_VERSION"
 
 # Build for iOS devices (ARM64)

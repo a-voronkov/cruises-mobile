@@ -2,9 +2,9 @@
 # Update this to rebuild libraries in CI/CD
 # Format: git commit hash or tag
 
-# Using master branch commit from 2026-01-09
-# This ensures we get the latest stable version with LFM2.5 support
-b4313
+# Using ggml-org/llama.cpp commit from 2026-01-09
+# (see https://github.com/ggml-org/llama.cpp/commit/9ac2693)
+9ac2693a302adab4b5b44fb1fef52c9e6d14a770
 
 # Alternative: use a specific tag
 # v1.0.0
