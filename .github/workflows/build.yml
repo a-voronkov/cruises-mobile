@@ -154,8 +154,21 @@ jobs:
 
       - name: Configure isolated Gradle cache
         run: |
-          echo "GRADLE_USER_HOME=${RUNNER_TEMP}/gradle-jdk${{ env.JAVA_VERSION }}" >> "$GITHUB_ENV"
-          echo "Using GRADLE_USER_HOME=${RUNNER_TEMP}/gradle-jdk${{ env.JAVA_VERSION }}"
+          GRADLE_HOME="${RUNNER_TEMP}/gradle-jdk${{ env.JAVA_VERSION }}"
+          echo "GRADLE_USER_HOME=$GRADLE_HOME" >> "$GITHUB_ENV"
+          echo "ORG_GRADLE_JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+          echo "Using GRADLE_USER_HOME=$GRADLE_HOME"
+          echo "Using ORG_GRADLE_JAVA_HOME=$JAVA_HOME"
+          mkdir -p "$GRADLE_HOME"
+          # Fix: self-hosted runner may reuse compiled script caches created under a different JDK
+          # (e.g. JDK 21 -> classfile major 65), which then fails under Java 17.
+          rm -rf "$GRADLE_HOME/caches" "$GRADLE_HOME/daemon" || true
+
+      - name: Verify Java used for Gradle
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME"
+          which java || true
+          java -version
 
       # Ensure Android SDK + sdkmanager are available (self-hosted runner might not export env vars)
       - name: Setup Android SDK
@@ -311,6 +324,16 @@ jobs:
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Configure Ruby toolcache dir (self-hosted)
+        if: steps.detect_pod.outputs.present != 'true'
+        run: |
+          # ruby/setup-ruby defaults to /Users/runner/hostedtoolcache on macOS.
+          # On self-hosted runners this path may not exist / be writable.
+          TOOLCACHE_DIR="${RUNNER_TEMP}/toolcache"
+          mkdir -p "$TOOLCACHE_DIR"
+          echo "RUNNER_TOOL_CACHE=$TOOLCACHE_DIR" >> "$GITHUB_ENV"
+          echo "AGENT_TOOLSDIRECTORY=$TOOLCACHE_DIR" >> "$GITHUB_ENV"
 
       - name: Setup Ruby (for CocoaPods)
         if: steps.detect_pod.outputs.present != 'true'
