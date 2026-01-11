@@ -6,7 +6,12 @@ echo "Building llama.cpp for Android"
 echo "========================================="
 
 # Configuration
-LLAMA_VERSION=$(head -n 6 scripts/llama-version.txt | tail -n 1)
+# Pick the first non-empty, non-comment line from scripts/llama-version.txt
+LLAMA_VERSION=$(grep -v '^[[:space:]]*#' scripts/llama-version.txt | grep -v '^[[:space:]]*$' | head -n 1)
+if [ -z "$LLAMA_VERSION" ]; then
+    echo "Error: Could not determine llama.cpp version from scripts/llama-version.txt"
+    exit 1
+fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 LLAMA_DIR="$PROJECT_ROOT/build/llama.cpp"

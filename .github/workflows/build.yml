@@ -21,6 +21,7 @@ name: Build and Release
 env:
   FLUTTER_VERSION: '3.19.0'
   JAVA_VERSION: '17'
+  ANDROID_NDK_VERSION: '25.1.8937393'
   LANG: en_US.UTF-8
 
 on:
@@ -142,6 +143,17 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: ${{ env.JAVA_VERSION }}
+
+      # Ensure Android SDK + sdkmanager are available (self-hosted runner might not export env vars)
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Ensure Android NDK installed
+        run: |
+          sdkmanager --install "ndk;${{ env.ANDROID_NDK_VERSION }}"
+          yes | sdkmanager --licenses > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
+          echo "ANDROID_NDK=$ANDROID_SDK_ROOT/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
 
       # Build (or reuse local runner cache) llama.cpp for Android
       - name: Ensure llama.cpp Android library
