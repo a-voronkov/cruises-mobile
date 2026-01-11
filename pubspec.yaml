@@ -54,10 +54,12 @@ dependencies:
   llama_cpp_dart: ^0.0.9
   ffi: ^2.1.2
 
-# Flutter 3.19.0 pins `meta` to 1.11.0, but llama_cpp_dart -> typed_isolate
-# requires meta ^1.15.0. `meta` is annotations-only, so overriding is safe here.
+# Flutter 3.19.0 uses Dart 3.3.x and pins `meta` to 1.11.0, but llama_cpp_dart ->
+# typed_isolate requires meta ^1.15.0. Also note that meta 1.17.0 requires Dart
+# >=3.5.0 and will fail on this runner. `meta` is annotations-only, so overriding
+# is safe here.
 dependency_overrides:
-  meta: ^1.15.0
+  meta: 1.16.0
 
 dev_dependencies:
   flutter_test:
