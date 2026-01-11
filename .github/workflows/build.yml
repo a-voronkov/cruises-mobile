@@ -273,10 +273,6 @@ jobs:
             flutter create --platforms=android --project-name "$PROJECT_NAME" . || true
 
             # Restore preserved gradle files (flutter create may downgrade Gradle version)
-            if [ -f "$RUNNER_TEMP/gradle-wrapper.properties.bak" ]; then
-              cp "$RUNNER_TEMP/gradle-wrapper.properties.bak" "android/gradle/wrapper/gradle-wrapper.properties"
-              echo "✅ Restored gradle-wrapper.properties"
-            fi
             if [ -f "$RUNNER_TEMP/android_build.gradle.bak" ]; then
               cp "$RUNNER_TEMP/android_build.gradle.bak" "android/build.gradle"
               echo "✅ Restored android/build.gradle"
@@ -287,6 +283,24 @@ jobs:
             fi
 
             echo "✅ Android resources generated"
+          fi
+
+          # Always ensure Gradle 8.0+ is configured (required by AGP 8.x)
+          GRADLE_WRAPPER_FILE="android/gradle/wrapper/gradle-wrapper.properties"
+          if [ -f "$GRADLE_WRAPPER_FILE" ]; then
+            CURRENT_GRADLE=$(grep distributionUrl "$GRADLE_WRAPPER_FILE" | grep -oE 'gradle-[0-9.]+' | head -1)
+            echo "Current Gradle version: $CURRENT_GRADLE"
+
+            # Check if version is less than 8.0
+            if echo "$CURRENT_GRADLE" | grep -qE 'gradle-[0-7]\.'; then
+              echo "⚠️  Gradle version is below 8.0, upgrading..."
+              sed -i.bak 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.0-all.zip|' "$GRADLE_WRAPPER_FILE"
+              echo "✅ Updated gradle-wrapper.properties to Gradle 8.0"
+              cat "$GRADLE_WRAPPER_FILE"
+            fi
+          else
+            echo "❌ gradle-wrapper.properties not found at $GRADLE_WRAPPER_FILE"
+            ls -la android/gradle/wrapper/ || true
           fi
 
           # Verify resources exist
