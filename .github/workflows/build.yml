@@ -279,6 +279,49 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      # The llama_cpp_dart package from pub.dev does NOT include the llama.cpp submodule.
+      # We need to clone it into the pub-cache directory for the native CMake build to work.
+      - name: Clone llama.cpp into llama_cpp_dart package
+        run: |
+          # Read version from our version file
+          LLAMA_VERSION=$(grep -v '^[[:space:]]*#' scripts/llama-version.txt | grep -v '^[[:space:]]*$' | head -n 1)
+          echo "llama.cpp version: $LLAMA_VERSION"
+
+          # Find the llama_cpp_dart package directory
+          PUB_CACHE="${PUB_CACHE:-$HOME/.pub-cache}"
+          LLAMA_PKG_DIR=$(find "$PUB_CACHE/hosted" -maxdepth 2 -type d -name "llama_cpp_dart-*" | head -n 1)
+
+          if [ -z "$LLAMA_PKG_DIR" ]; then
+            echo "❌ Error: llama_cpp_dart package not found in pub cache"
+            exit 1
+          fi
+          echo "Found llama_cpp_dart at: $LLAMA_PKG_DIR"
+
+          # Clone llama.cpp into the android subdirectory of the package
+          LLAMA_CPP_DIR="$LLAMA_PKG_DIR/android/llama.cpp"
+          if [ ! -d "$LLAMA_CPP_DIR" ]; then
+            echo "Cloning llama.cpp into $LLAMA_CPP_DIR..."
+            git clone --depth 1 --branch "$LLAMA_VERSION" https://github.com/ggml-org/llama.cpp "$LLAMA_CPP_DIR" || \
+            git clone https://github.com/ggml-org/llama.cpp "$LLAMA_CPP_DIR"
+
+            if [ -d "$LLAMA_CPP_DIR" ]; then
+              cd "$LLAMA_CPP_DIR"
+              git fetch --tags origin
+              git checkout "$LLAMA_VERSION" || echo "Warning: Could not checkout $LLAMA_VERSION, using default branch"
+            fi
+          else
+            echo "✅ llama.cpp already exists at $LLAMA_CPP_DIR"
+          fi
+
+          # Verify
+          if [ -d "$LLAMA_CPP_DIR" ]; then
+            echo "✅ llama.cpp cloned successfully"
+            ls -la "$LLAMA_CPP_DIR" | head -10
+          else
+            echo "❌ Error: Failed to clone llama.cpp"
+            exit 1
+          fi
+
       # Build APK
       - name: Build APK
         run: |
@@ -464,6 +507,50 @@ jobs:
       # Get dependencies (should be fast due to cache)
       - name: Get dependencies
         run: flutter pub get
+
+      # The llama_cpp_dart package from pub.dev does NOT include the llama.cpp submodule.
+      # We need to clone it into the pub-cache directory for the native build to work.
+      - name: Clone llama.cpp into llama_cpp_dart package
+        run: |
+          # Read version from our version file
+          LLAMA_VERSION=$(grep -v '^[[:space:]]*#' scripts/llama-version.txt | grep -v '^[[:space:]]*$' | head -n 1)
+          echo "llama.cpp version: $LLAMA_VERSION"
+
+          # Find the llama_cpp_dart package directory
+          PUB_CACHE="${PUB_CACHE:-$HOME/.pub-cache}"
+          LLAMA_PKG_DIR=$(find "$PUB_CACHE/hosted" -maxdepth 2 -type d -name "llama_cpp_dart-*" | head -n 1)
+
+          if [ -z "$LLAMA_PKG_DIR" ]; then
+            echo "❌ Error: llama_cpp_dart package not found in pub cache"
+            exit 1
+          fi
+          echo "Found llama_cpp_dart at: $LLAMA_PKG_DIR"
+
+          # Clone llama.cpp into the package (for both ios and android builds)
+          # The CMakeLists.txt references ./llama.cpp from the android/ directory
+          LLAMA_CPP_DIR="$LLAMA_PKG_DIR/android/llama.cpp"
+          if [ ! -d "$LLAMA_CPP_DIR" ]; then
+            echo "Cloning llama.cpp into $LLAMA_CPP_DIR..."
+            git clone --depth 1 --branch "$LLAMA_VERSION" https://github.com/ggml-org/llama.cpp "$LLAMA_CPP_DIR" || \
+            git clone https://github.com/ggml-org/llama.cpp "$LLAMA_CPP_DIR"
+
+            if [ -d "$LLAMA_CPP_DIR" ]; then
+              cd "$LLAMA_CPP_DIR"
+              git fetch --tags origin
+              git checkout "$LLAMA_VERSION" || echo "Warning: Could not checkout $LLAMA_VERSION, using default branch"
+            fi
+          else
+            echo "✅ llama.cpp already exists at $LLAMA_CPP_DIR"
+          fi
+
+          # Verify
+          if [ -d "$LLAMA_CPP_DIR" ]; then
+            echo "✅ llama.cpp cloned successfully"
+            ls -la "$LLAMA_CPP_DIR" | head -10
+          else
+            echo "❌ Error: Failed to clone llama.cpp"
+            exit 1
+          fi
 
       - name: Detect CocoaPods
         id: detect_pod
