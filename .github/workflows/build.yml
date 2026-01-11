@@ -21,6 +21,7 @@ name: Build and Release
 env:
   FLUTTER_VERSION: '3.19.0'
   JAVA_VERSION: '17'
+  GRADLE_VERSION: '8.2.1'
   ANDROID_NDK_VERSION: '25.1.8937393'
   LANG: en_US.UTF-8
 
@@ -161,15 +162,35 @@ jobs:
         run: |
           # Use a per-run Gradle user home to avoid reusing compiled script caches that may have
           # been produced by a different JDK on the persistent self-hosted runner.
-          GRADLE_HOME="${RUNNER_TEMP}/gradle-${{ github.run_id }}-${{ github.run_attempt }}-jdk${{ env.JAVA_VERSION }}"
-          echo "GRADLE_USER_HOME=$GRADLE_HOME" >> "$GITHUB_ENV"
-          echo "ORG_GRADLE_JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
-          echo "Using GRADLE_USER_HOME=$GRADLE_HOME"
-          echo "Using ORG_GRADLE_JAVA_HOME=$JAVA_HOME"
-          mkdir -p "$GRADLE_HOME"
+          GRADLE_USER_HOME_DIR="${RUNNER_TEMP}/gradle-${{ github.run_id }}-${{ github.run_attempt }}-jdk${{ env.JAVA_VERSION }}"
+          echo "GRADLE_USER_HOME=$GRADLE_USER_HOME_DIR" >> "$GITHUB_ENV"
+
+          # Also force Gradle to use the same JDK we selected above (self-hosted runners may have
+          # a different system default Java).
+          echo "GRADLE_OPTS=$GRADLE_OPTS -Dorg.gradle.java.home=$JAVA_HOME" >> "$GITHUB_ENV"
+
+          echo "Using GRADLE_USER_HOME=$GRADLE_USER_HOME_DIR"
+          echo "Using org.gradle.java.home=$JAVA_HOME"
+          mkdir -p "$GRADLE_USER_HOME_DIR"
           # Fix: self-hosted runner may reuse compiled script caches created under a different JDK
           # (e.g. JDK 21 -> classfile major 65), which then fails under Java 17.
-          rm -rf "$GRADLE_HOME/caches" "$GRADLE_HOME/daemon" || true
+          rm -rf "$GRADLE_USER_HOME_DIR/caches" "$GRADLE_USER_HOME_DIR/daemon" || true
+
+      - name: Setup Gradle (pin version)
+        run: |
+          GRADLE_VERSION="${{ env.GRADLE_VERSION }}"
+          GRADLE_DIST_DIR="$RUNNER_TEMP/gradle-dist-$GRADLE_VERSION"
+          GRADLE_ZIP="$RUNNER_TEMP/gradle-$GRADLE_VERSION-bin.zip"
+
+          if [ ! -d "$GRADLE_DIST_DIR/gradle-$GRADLE_VERSION" ]; then
+            echo "Downloading Gradle $GRADLE_VERSION..."
+            curl -sSL -o "$GRADLE_ZIP" "https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip"
+            mkdir -p "$GRADLE_DIST_DIR"
+            unzip -q "$GRADLE_ZIP" -d "$GRADLE_DIST_DIR"
+          fi
+
+          echo "$GRADLE_DIST_DIR/gradle-$GRADLE_VERSION/bin" >> $GITHUB_PATH
+          gradle -v
 
       - name: Verify Java used for Gradle
         run: |
@@ -394,6 +415,28 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2'
+
+      - name: Ensure libyaml for Ruby (psych) on self-hosted runner
+        if: steps.detect_pod.outputs.present != 'true'
+        run: |
+          # Ruby's psych extension depends on libyaml. The prebuilt Ruby from ruby/setup-ruby
+          # expects Homebrew libyaml at /opt/homebrew/opt/libyaml on Apple Silicon.
+          if command -v brew >/dev/null 2>&1; then
+            export HOMEBREW_NO_AUTO_UPDATE=1
+            if ! brew list libyaml >/dev/null 2>&1; then
+              echo "Installing libyaml via Homebrew..."
+              brew install libyaml
+            else
+              echo "✅ libyaml already installed"
+            fi
+
+            YAML_PREFIX="$(brew --prefix libyaml || true)"
+            echo "libyaml prefix: ${YAML_PREFIX}"
+            ls -l "${YAML_PREFIX}/lib/libyaml-0.2.dylib" || true
+          else
+            echo "❌ Homebrew (brew) not found. Install libyaml on the self-hosted runner so Ruby can load psych.bundle."
+            exit 1
+          fi
 
       # Install CocoaPods dependencies
       - name: Install CocoaPods dependencies
