@@ -84,11 +84,12 @@ cmake .. \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
     -DCMAKE_OSX_ARCHITECTURES=arm64 \
     -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_SHARED_LIBS=OFF \
+	    -DBUILD_SHARED_LIBS=OFF \
+	    -DLLAMA_CURL=OFF \
     -DLLAMA_BUILD_TESTS=OFF \
     -DLLAMA_BUILD_EXAMPLES=OFF \
-    -DLLAMA_BUILD_SERVER=OFF \
-    -DLLAMA_METAL=ON \
+	    -DLLAMA_BUILD_SERVER=OFF \
+	    -DGGML_METAL=ON \
     -DCMAKE_C_FLAGS="-fembed-bitcode" \
     -DCMAKE_CXX_FLAGS="-fembed-bitcode"
 
@@ -110,11 +111,12 @@ cmake .. \
     -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" \
     -DCMAKE_OSX_SYSROOT=iphonesimulator \
     -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_SHARED_LIBS=OFF \
+	    -DBUILD_SHARED_LIBS=OFF \
+	    -DLLAMA_CURL=OFF \
     -DLLAMA_BUILD_TESTS=OFF \
     -DLLAMA_BUILD_EXAMPLES=OFF \
-    -DLLAMA_BUILD_SERVER=OFF \
-    -DLLAMA_METAL=ON
+	    -DLLAMA_BUILD_SERVER=OFF \
+	    -DGGML_METAL=ON
 
 cmake --build . --config Release -j$(sysctl -n hw.ncpu)
 
