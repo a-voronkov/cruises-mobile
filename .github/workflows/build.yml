@@ -807,6 +807,8 @@ jobs:
     needs: [build-android, build-ios]
     runs-on: self-hosted
     # Create release on EVERY successful build (push to main or manual dispatch)
+    permissions:
+      contents: write  # Required to create releases and upload assets
 
     steps:
       - name: Checkout code
