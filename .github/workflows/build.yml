@@ -149,6 +149,11 @@ jobs:
           distribution: 'zulu'
           java-version: ${{ env.JAVA_VERSION }}
 
+      - name: Capture Java home (lock for later steps)
+        run: |
+          # Some Actions may modify JAVA_HOME; keep the JDK selected above for Flutter/Gradle.
+          echo "JDK_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+
       - name: Show Java version
         run: java -version
 
@@ -171,6 +176,14 @@ jobs:
           echo "JAVA_HOME=$JAVA_HOME"
           which java || true
           java -version
+
+      - name: Verify Java before Flutter build
+        run: |
+          echo "JAVA_HOME(before)=$JAVA_HOME"
+          echo "JDK_HOME=$JDK_HOME"
+          echo "java(before)=$(which java || true)"
+          java -version
+          flutter doctor -v || true
 
       # Ensure Android SDK + sdkmanager are available (self-hosted runner might not export env vars)
       - name: Setup Android SDK
@@ -224,11 +237,22 @@ jobs:
 
       # Build APK
       - name: Build APK
-        run: flutter build apk --release
+        run: |
+          # Force Flutter/Gradle to use the JDK installed by actions/setup-java.
+          export JAVA_HOME="$JDK_HOME"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          echo "JAVA_HOME(used)=$JAVA_HOME"
+          java -version
+          flutter build apk --release --verbose
 
       # Build App Bundle
       - name: Build App Bundle
-        run: flutter build appbundle --release
+        run: |
+          export JAVA_HOME="$JDK_HOME"
+          export PATH="$JAVA_HOME/bin:$PATH"
+          echo "JAVA_HOME(used)=$JAVA_HOME"
+          java -version
+          flutter build appbundle --release --verbose
 
       # Upload APK artifact
       - name: Upload APK artifact
@@ -253,6 +277,13 @@ jobs:
     name: Build iOS IPA
     runs-on: self-hosted
     needs: setup
+
+    # ruby/setup-ruby expects a writable toolcache directory.
+    # On self-hosted macOS runners the hosted default (/Users/runner/hostedtoolcache) may not exist.
+    # Put toolcache next to the runner's _work directory: <runner_root>/_toolcache.
+    env:
+      RUNNER_TOOL_CACHE: ${{ runner.workspace }}/../_toolcache
+      AGENT_TOOLSDIRECTORY: ${{ runner.workspace }}/../_toolcache
 
     steps:
       - name: Checkout code
@@ -327,21 +358,12 @@ jobs:
             echo "present=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Configure Ruby toolcache dir (self-hosted)
+      - name: Ensure Ruby toolcache dir exists (self-hosted)
         if: steps.detect_pod.outputs.present != 'true'
         run: |
-          # ruby/setup-ruby defaults to /Users/runner/hostedtoolcache on macOS.
-          # On self-hosted runners this path may not exist / be writable.
-          TOOLCACHE_DIR="${RUNNER_TEMP}/toolcache"
-          mkdir -p "$TOOLCACHE_DIR"
-          echo "RUNNER_TOOL_CACHE=$TOOLCACHE_DIR" >> "$GITHUB_ENV"
-          echo "AGENT_TOOLSDIRECTORY=$TOOLCACHE_DIR" >> "$GITHUB_ENV"
-
-          # Some self-hosted macOS runners may not have /Users/runner (or it may be unwritable).
-          # ruby/setup-ruby uses the home directory for various paths; force it to a writable dir.
-          HOME_DIR="${RUNNER_TEMP}/home"
-          mkdir -p "$HOME_DIR"
-          echo "HOME=$HOME_DIR" >> "$GITHUB_ENV"
+          echo "RUNNER_TOOL_CACHE=$RUNNER_TOOL_CACHE"
+          echo "AGENT_TOOLSDIRECTORY=$AGENT_TOOLSDIRECTORY"
+          mkdir -p "$RUNNER_TOOL_CACHE"
 
       - name: Setup Ruby (for CocoaPods)
         if: steps.detect_pod.outputs.present != 'true'
