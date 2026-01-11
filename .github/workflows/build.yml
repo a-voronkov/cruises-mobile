@@ -68,12 +68,6 @@ jobs:
           echo "$HOME/flutter/bin" >> $GITHUB_PATH
           echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
 
-      # Upgrade Flutter to ensure latest stable
-      - name: Upgrade Flutter
-        run: |
-          flutter upgrade --force
-          flutter --version
-
       # Run flutter doctor
       - name: Flutter Doctor
         run: flutter doctor -v
