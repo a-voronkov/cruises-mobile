@@ -148,8 +148,10 @@ jobs:
         run: |
           chmod +x scripts/build-llama-android.sh
           bash scripts/build-llama-android.sh
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+
+        # NOTE: Do not override ANDROID_NDK_HOME here.
+        # On self-hosted runners it's usually configured as a machine-level env var,
+        # and setting it via `${{ env.ANDROID_NDK_HOME }}` can unintentionally blank it.
 
       # Verify llama.cpp library exists
       - name: Verify llama.cpp library

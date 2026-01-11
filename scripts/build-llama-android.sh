@@ -29,14 +29,57 @@ if [ -f "$CACHED_LIB" ]; then
     exit 0
 fi
 
-# Check if Android NDK is available
-if [ -z "$ANDROID_NDK_HOME" ] && [ -z "$ANDROID_NDK" ]; then
-    echo "Error: ANDROID_NDK_HOME or ANDROID_NDK environment variable not set"
-    echo "Please set it to your Android NDK installation path"
+resolve_ndk_path() {
+    # 1) Explicit env vars (preferred)
+    if [ -n "$ANDROID_NDK_HOME" ] && [ -f "$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" ]; then
+        echo "$ANDROID_NDK_HOME"
+        return 0
+    fi
+    if [ -n "$ANDROID_NDK" ] && [ -f "$ANDROID_NDK/build/cmake/android.toolchain.cmake" ]; then
+        echo "$ANDROID_NDK"
+        return 0
+    fi
+
+    # 2) Try to infer from Android SDK root
+    # Common locations on self-hosted macOS runners include:
+    #   - $ANDROID_SDK_ROOT
+    #   - $ANDROID_HOME
+    #   - $HOME/Library/Android/sdk
+    #   - $HOME/Android/Sdk
+    local sdk_root
+    for sdk_root in "$ANDROID_SDK_ROOT" "$ANDROID_HOME" "$HOME/Library/Android/sdk" "$HOME/Android/Sdk" \
+        "/usr/local/share/android-sdk" "/opt/android-sdk"; do
+        if [ -n "$sdk_root" ] && [ -d "$sdk_root" ]; then
+            # Legacy NDK location
+            if [ -f "$sdk_root/ndk-bundle/build/cmake/android.toolchain.cmake" ]; then
+                echo "$sdk_root/ndk-bundle"
+                return 0
+            fi
+
+            # Modern NDK location: $SDK/ndk/<version>
+            if [ -d "$sdk_root/ndk" ]; then
+                local newest
+                newest=$(ls -1dt "$sdk_root/ndk/"* 2>/dev/null | head -n 1 || true)
+                if [ -n "$newest" ] && [ -f "$newest/build/cmake/android.toolchain.cmake" ]; then
+                    echo "$newest"
+                    return 0
+                fi
+            fi
+        fi
+    done
+
+    return 1
+}
+
+# Resolve Android NDK path (env var or auto-detected)
+NDK_PATH="$(resolve_ndk_path || true)"
+if [ -z "$NDK_PATH" ]; then
+    echo "Error: Android NDK not found."
+    echo "Tried ANDROID_NDK_HOME/ANDROID_NDK, then SDK roots: ANDROID_SDK_ROOT, ANDROID_HOME, ~/Library/Android/sdk, ~/Android/Sdk."
+    echo "Please install Android NDK and/or set ANDROID_NDK_HOME to your NDK path."
     exit 1
 fi
 
-NDK_PATH="${ANDROID_NDK_HOME:-$ANDROID_NDK}"
 echo "Using Android NDK: $NDK_PATH"
 
 # Clone llama.cpp if not exists
