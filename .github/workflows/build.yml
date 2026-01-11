@@ -37,6 +37,9 @@ jobs:
     name: Setup Dependencies & Tools
     runs-on: self-hosted
 
+    outputs:
+      has-generated-code: ${{ steps.detect-generated.outputs.present }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -70,8 +73,18 @@ jobs:
       - name: Run code generation
         run: flutter pub run build_runner build --delete-conflicting-outputs
 
+      - name: Detect generated code
+        id: detect-generated
+        run: |
+          if find . -type f \( -name "*.g.dart" -o -name "*.freezed.dart" -o -name "*.config.dart" \) -print -quit | grep -q .; then
+            echo "present=true" >> $GITHUB_OUTPUT
+          else
+            echo "present=false" >> $GITHUB_OUTPUT
+          fi
+
       # Upload generated code as artifact for build jobs
       - name: Upload generated code
+        if: steps.detect-generated.outputs.present == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: generated-code
@@ -79,7 +92,7 @@ jobs:
             **/*.g.dart
             **/*.freezed.dart
             **/*.config.dart
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 1
 
       # Analyze code
@@ -117,6 +130,7 @@ jobs:
 
       # Download generated code from setup job
       - name: Download generated code
+        if: needs.setup.outputs.has-generated-code == 'true'
         uses: actions/download-artifact@v4
         with:
           name: generated-code
@@ -202,6 +216,7 @@ jobs:
 
       # Download generated code from setup job
       - name: Download generated code
+        if: needs.setup.outputs.has-generated-code == 'true'
         uses: actions/download-artifact@v4
         with:
           name: generated-code
