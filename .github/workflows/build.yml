@@ -181,6 +181,7 @@ jobs:
           GRADLE_VERSION="${{ env.GRADLE_VERSION }}"
           GRADLE_DIST_DIR="$RUNNER_TEMP/gradle-dist-$GRADLE_VERSION"
           GRADLE_ZIP="$RUNNER_TEMP/gradle-$GRADLE_VERSION-bin.zip"
+          GRADLE_BIN_DIR="$GRADLE_DIST_DIR/gradle-$GRADLE_VERSION/bin"
 
           if [ ! -d "$GRADLE_DIST_DIR/gradle-$GRADLE_VERSION" ]; then
             echo "Downloading Gradle $GRADLE_VERSION..."
@@ -189,7 +190,10 @@ jobs:
             unzip -q "$GRADLE_ZIP" -d "$GRADLE_DIST_DIR"
           fi
 
-          echo "$GRADLE_DIST_DIR/gradle-$GRADLE_VERSION/bin" >> $GITHUB_PATH
+          # NOTE: $GITHUB_PATH affects subsequent steps only. Export PATH here so `gradle` is
+          # available in this step as well.
+          echo "$GRADLE_BIN_DIR" >> $GITHUB_PATH
+          export PATH="$GRADLE_BIN_DIR:$PATH"
           gradle -v
 
       - name: Verify Java used for Gradle
@@ -435,6 +439,34 @@ jobs:
             ls -l "${YAML_PREFIX}/lib/libyaml-0.2.dylib" || true
           else
             echo "❌ Homebrew (brew) not found. Install libyaml on the self-hosted runner so Ruby can load psych.bundle."
+            exit 1
+          fi
+
+      - name: Ensure OpenSSL for Ruby (RubyGems HTTPS)
+        if: steps.detect_pod.outputs.present != 'true'
+        run: |
+          # RubyGems needs Ruby's OpenSSL extension for HTTPS downloads.
+          # On self-hosted Apple Silicon runners the prebuilt Ruby can dynamically link to
+          # Homebrew OpenSSL libraries.
+          if command -v brew >/dev/null 2>&1; then
+            export HOMEBREW_NO_AUTO_UPDATE=1
+
+            if ! brew list openssl@3 >/dev/null 2>&1; then
+              echo "Installing openssl@3 via Homebrew..."
+              brew install openssl@3
+            else
+              echo "✅ openssl@3 already installed"
+            fi
+
+            OPENSSL_PREFIX="$(brew --prefix openssl@3 || true)"
+            echo "openssl@3 prefix: ${OPENSSL_PREFIX}"
+            ls -l "${OPENSSL_PREFIX}/lib/libssl.3.dylib" || true
+            ls -l "${OPENSSL_PREFIX}/lib/libcrypto.3.dylib" || true
+
+            # Sanity-check that the selected Ruby can load OpenSSL.
+            ruby -ropenssl -e 'puts OpenSSL::OPENSSL_VERSION'
+          else
+            echo "❌ Homebrew (brew) not found. Install OpenSSL (openssl@3) on the self-hosted runner so gem can download over HTTPS."
             exit 1
           fi
 
