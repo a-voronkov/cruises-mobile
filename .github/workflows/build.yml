@@ -293,8 +293,20 @@ jobs:
       # Install CocoaPods dependencies
       - name: Install CocoaPods dependencies
         run: |
-          cd ios
-          pod install
+	          if ! command -v pod >/dev/null 2>&1; then
+	            echo "⚠️  CocoaPods (pod) not found. Installing to user gem dir..."
+	            if ! command -v gem >/dev/null 2>&1; then
+	              echo "❌ RubyGems (gem) not found on runner; cannot install CocoaPods"
+	              exit 1
+	            fi
+	            gem install --user-install cocoapods -N
+	            POD_BIN_DIR="$(ruby -e 'print Gem.user_dir')/bin"
+	            echo "$POD_BIN_DIR" >> "$GITHUB_PATH"
+	            export PATH="$POD_BIN_DIR:$PATH"
+	          fi
+	          pod --version
+	          cd ios
+	          pod install
 
       # Build iOS (no codesign for now)
       - name: Build iOS (no codesign)

@@ -131,12 +131,21 @@ cmake --build . --config Release -j$CPU_COUNT
 # Copy library to Flutter project
 echo "Copying libllama.so to Flutter project..."
 mkdir -p "$OUTPUT_DIR/arm64-v8a"
-cp libllama.so "$OUTPUT_DIR/arm64-v8a/"
+
+SO_PATH="src/libllama.so"
+if [ ! -f "$SO_PATH" ]; then
+    echo "❌ Error: libllama.so not found at expected path: $BUILD_DIR/$SO_PATH"
+    echo "Listing possible libllama.so locations (up to depth 4):"
+    find . -maxdepth 4 -name libllama.so -print || true
+    exit 70
+fi
+
+cp "$SO_PATH" "$OUTPUT_DIR/arm64-v8a/libllama.so"
 
 # Save to local cache for subsequent runs
 echo "Saving libllama.so to local cache..."
 mkdir -p "$(dirname "$CACHED_LIB")"
-cp libllama.so "$CACHED_LIB"
+cp "$SO_PATH" "$CACHED_LIB"
 
 cd "$LLAMA_DIR"
 
