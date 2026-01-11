@@ -104,9 +104,20 @@ jobs:
           restore-keys: |
             generated-${{ runner.os }}-
 
-      # Run code generation if not cached
+      # If cache reports a hit but no generated files are present (e.g. empty/old cache),
+      # ensure we still generate them so downstream jobs can download the artifact.
+      - name: Check generated code present
+        id: check-generated
+        run: |
+          if find lib -type f \( -name "*.g.dart" -o -name "*.freezed.dart" -o -name "*.config.dart" \) -print -quit | grep -q .; then
+            echo "present=true" >> $GITHUB_OUTPUT
+          else
+            echo "present=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Run code generation if not cached OR if generated files are missing
       - name: Run code generation
-        if: steps.cache-generated.outputs.cache-hit != 'true'
+        if: steps.cache-generated.outputs.cache-hit != 'true' || steps.check-generated.outputs.present != 'true'
         run: flutter pub run build_runner build --delete-conflicting-outputs
 
       # Upload generated code as artifact for build jobs
@@ -118,6 +129,7 @@ jobs:
             **/*.g.dart
             **/*.freezed.dart
             **/*.config.dart
+          if-no-files-found: error
           retention-days: 1
 
       # Analyze code
