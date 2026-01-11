@@ -155,6 +155,21 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
           echo "ANDROID_NDK=$ANDROID_SDK_ROOT/ndk/${{ env.ANDROID_NDK_VERSION }}" >> $GITHUB_ENV
 
+      - name: Ensure CMake available (required by llama.cpp build scripts)
+        run: |
+          if command -v cmake >/dev/null 2>&1; then
+            echo "✅ CMake already available: $(cmake --version | head -n 1)"
+            exit 0
+          fi
+
+          echo "CMake not found; installing via Android SDK..."
+          sdkmanager --install "cmake;3.22.1"
+          yes | sdkmanager --licenses > /dev/null
+
+          CMAKE_BIN_DIR="$ANDROID_SDK_ROOT/cmake/3.22.1/bin"
+          "$CMAKE_BIN_DIR/cmake" --version
+          echo "$CMAKE_BIN_DIR" >> $GITHUB_PATH
+
       # Build (or reuse local runner cache) llama.cpp for Android
       - name: Ensure llama.cpp Android library
         run: |
@@ -235,6 +250,25 @@ jobs:
         with:
           name: generated-code
           path: .
+
+      - name: Ensure CMake available (required by llama.cpp build scripts)
+        run: |
+          if command -v cmake >/dev/null 2>&1; then
+            echo "✅ CMake already available: $(cmake --version | head -n 1)"
+            exit 0
+          fi
+
+          if command -v brew >/dev/null 2>&1; then
+            echo "CMake not found; installing via Homebrew..."
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install cmake
+            cmake --version
+            exit 0
+          fi
+
+          echo "❌ Error: cmake is required but was not found, and Homebrew is unavailable on this runner."
+          echo "Install CMake on the self-hosted runner, or add a workflow step to provide it."
+          exit 1
+
 
       # Build (or reuse local runner cache) llama.cpp for iOS
       - name: Ensure llama.cpp for iOS
