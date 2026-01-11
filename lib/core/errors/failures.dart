@@ -12,66 +12,66 @@ abstract class Failure extends Equatable {
 
 /// Server-related failures
 class ServerFailure extends Failure {
-  const ServerFailure([String message = 'Server error occurred']) : super(message);
+  const ServerFailure([super.message = 'Server error occurred']);
 }
 
 /// Cache-related failures
 class CacheFailure extends Failure {
-  const CacheFailure([String message = 'Cache error occurred']) : super(message);
+  const CacheFailure([super.message = 'Cache error occurred']);
 }
 
 /// Network-related failures
 class NetworkFailure extends Failure {
-  const NetworkFailure([String message = 'Network error occurred']) : super(message);
+  const NetworkFailure([super.message = 'Network error occurred']);
 }
 
 /// Model-related failures
 class ModelFailure extends Failure {
-  const ModelFailure([String message = 'Model error occurred']) : super(message);
+  const ModelFailure([super.message = 'Model error occurred']);
 }
 
 /// Model not found failure
 class ModelNotFoundFailure extends ModelFailure {
-  const ModelNotFoundFailure([String message = 'Model not found']) : super(message);
+  const ModelNotFoundFailure([super.message = 'Model not found']);
 }
 
 /// Model download failure
 class ModelDownloadFailure extends ModelFailure {
-  const ModelDownloadFailure([String message = 'Failed to download model']) : super(message);
+  const ModelDownloadFailure([super.message = 'Failed to download model']);
 }
 
 /// Model loading failure
 class ModelLoadFailure extends ModelFailure {
-  const ModelLoadFailure([String message = 'Failed to load model']) : super(message);
+  const ModelLoadFailure([super.message = 'Failed to load model']);
 }
 
 /// Inference failure
 class InferenceFailure extends Failure {
-  const InferenceFailure([String message = 'Inference failed']) : super(message);
+  const InferenceFailure([super.message = 'Inference failed']);
 }
 
 /// Validation failure
 class ValidationFailure extends Failure {
-  const ValidationFailure([String message = 'Validation failed']) : super(message);
+  const ValidationFailure([super.message = 'Validation failed']);
 }
 
 /// Permission failure
 class PermissionFailure extends Failure {
-  const PermissionFailure([String message = 'Permission denied']) : super(message);
+  const PermissionFailure([super.message = 'Permission denied']);
 }
 
 /// Storage failure
 class StorageFailure extends Failure {
-  const StorageFailure([String message = 'Storage error occurred']) : super(message);
+  const StorageFailure([super.message = 'Storage error occurred']);
 }
 
 /// File system failure
 class FileSystemFailure extends Failure {
-  const FileSystemFailure([String message = 'File system error occurred']) : super(message);
+  const FileSystemFailure([super.message = 'File system error occurred']);
 }
 
 /// Unknown failure
 class UnknownFailure extends Failure {
-  const UnknownFailure([String message = 'An unknown error occurred']) : super(message);
+  const UnknownFailure([super.message = 'An unknown error occurred']);
 }
 

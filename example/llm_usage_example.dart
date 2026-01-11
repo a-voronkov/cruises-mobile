@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 // Example of using LlamaService for LLM inference
 // This is a standalone example showing how to use the LLM integration
 

@@ -43,7 +43,7 @@ class LlamaService {
       final fileName = modelFileName ?? AppConstants.modelFileName;
       _modelPath = await _getModelPath(fileName);
 
-      if (_modelPath == null || !await File(_modelPath!).exists()) {
+      if (_modelPath == null || !File(_modelPath!).existsSync()) {
         debugPrint('LlamaService: Model file not found at $_modelPath');
         return false;
       }
@@ -167,14 +167,14 @@ class LlamaService {
     try {
       // First check in models/ directory (for development)
       final devModelPath = 'models/$fileName';
-      if (await File(devModelPath).exists()) {
+      if (File(devModelPath).existsSync()) {
         return devModelPath;
       }
 
       // Then check in app documents directory (for production)
       final appDir = await getApplicationDocumentsDirectory();
       final prodModelPath = '${appDir.path}/models/$fileName';
-      if (await File(prodModelPath).exists()) {
+      if (File(prodModelPath).existsSync()) {
         return prodModelPath;
       }
 

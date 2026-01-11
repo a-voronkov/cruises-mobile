@@ -11,73 +11,79 @@ class AppException implements Exception {
 
 /// Server exception
 class ServerException extends AppException {
-  ServerException([String message = 'Server error', dynamic error])
-      : super(message, error);
+  ServerException([super.message = 'Server error', super.originalError]);
 }
 
 /// Cache exception
 class CacheException extends AppException {
-  CacheException([String message = 'Cache error', dynamic error])
-      : super(message, error);
+  CacheException([super.message = 'Cache error', super.originalError]);
 }
 
 /// Network exception
 class NetworkException extends AppException {
-  NetworkException([String message = 'Network error', dynamic error])
-      : super(message, error);
+  NetworkException([super.message = 'Network error', super.originalError]);
 }
 
 /// Model exception
 class ModelException extends AppException {
-  ModelException([String message = 'Model error', dynamic error])
-      : super(message, error);
+  ModelException([super.message = 'Model error', super.originalError]);
 }
 
 /// Model not found exception
 class ModelNotFoundException extends ModelException {
-  ModelNotFoundException([String message = 'Model not found', dynamic error])
-      : super(message, error);
+  ModelNotFoundException([
+    super.message = 'Model not found',
+    super.originalError,
+  ]);
 }
 
 /// Model download exception
 class ModelDownloadException extends ModelException {
-  ModelDownloadException([String message = 'Model download failed', dynamic error])
-      : super(message, error);
+  ModelDownloadException([
+    super.message = 'Model download failed',
+    super.originalError,
+  ]);
 }
 
 /// Model load exception
 class ModelLoadException extends ModelException {
-  ModelLoadException([String message = 'Model load failed', dynamic error])
-      : super(message, error);
+  ModelLoadException([
+    super.message = 'Model load failed',
+    super.originalError,
+  ]);
 }
 
 /// Inference exception
 class InferenceException extends AppException {
-  InferenceException([String message = 'Inference failed', dynamic error])
-      : super(message, error);
+  InferenceException([super.message = 'Inference failed', super.originalError]);
 }
 
 /// Validation exception
 class ValidationException extends AppException {
-  ValidationException([String message = 'Validation failed', dynamic error])
-      : super(message, error);
+  ValidationException([
+    super.message = 'Validation failed',
+    super.originalError,
+  ]);
 }
 
 /// Permission exception
 class PermissionException extends AppException {
-  PermissionException([String message = 'Permission denied', dynamic error])
-      : super(message, error);
+  PermissionException([
+    super.message = 'Permission denied',
+    super.originalError,
+  ]);
 }
 
 /// Storage exception
 class StorageException extends AppException {
-  StorageException([String message = 'Storage error', dynamic error])
-      : super(message, error);
+  StorageException([super.message = 'Storage error', super.originalError]);
 }
 
 /// File system exception
 class FileSystemException extends AppException {
-  FileSystemException([String message = 'File system error', dynamic error])
-      : super(message, error);
+  FileSystemException([
+    super.message = 'File system error',
+    super.originalError,
+  ]);
 }
 
