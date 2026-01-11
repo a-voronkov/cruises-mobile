@@ -214,6 +214,14 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      # Fix conflicting Android environment variables
+      - name: Fix Android env vars (ANDROID_SDK_HOME vs ANDROID_USER_HOME)
+        run: |
+          # If both ANDROID_SDK_HOME and ANDROID_USER_HOME are set, AGP fails.
+          # Keep ANDROID_USER_HOME (recommended) and clear ANDROID_SDK_HOME (deprecated).
+          # See: https://developer.android.com/tools/variables
+          echo "ANDROID_SDK_HOME=" >> $GITHUB_ENV
+
       - name: Ensure Android NDK installed
         run: |
           sdkmanager --install "ndk;${{ env.ANDROID_NDK_VERSION }}"
@@ -336,6 +344,42 @@ jobs:
         with:
           name: generated-code
           path: .
+
+      - name: Ensure iOS project files exist (Podfile/Xcode project)
+        run: |
+          # Some repos may not check in the full iOS scaffold. CocoaPods requires ios/Podfile,
+          # and Flutter iOS builds require ios/Runner.xcodeproj.
+          if [ ! -f "ios/Podfile" ] || [ ! -d "ios/Runner.xcodeproj" ]; then
+            echo "⚠️  iOS project scaffold missing (Podfile or Runner.xcodeproj). Regenerating via flutter create..."
+
+            # Preserve any custom Info.plist committed in the repo.
+            if [ -f "ios/Runner/Info.plist" ]; then
+              cp "ios/Runner/Info.plist" "$RUNNER_TEMP/Info.plist.bak"
+            fi
+
+            # Preserve llama xcframework if it already exists (avoid losing it if flutter create overwrites ios/).
+            if [ -d "ios/Frameworks/llama.xcframework" ]; then
+              rm -rf "$RUNNER_TEMP/llama.xcframework.bak"
+              cp -R "ios/Frameworks/llama.xcframework" "$RUNNER_TEMP/llama.xcframework.bak"
+            fi
+
+            # Try without overwrite first (safer), but fall back to overwrite if the tool
+            # refuses due to missing .metadata or non-empty directory.
+            flutter create --platforms=ios --no-pub . || flutter create --platforms=ios --no-pub --overwrite .
+
+            if [ -f "$RUNNER_TEMP/Info.plist.bak" ]; then
+              cp "$RUNNER_TEMP/Info.plist.bak" "ios/Runner/Info.plist"
+            fi
+
+            if [ -d "$RUNNER_TEMP/llama.xcframework.bak" ]; then
+              mkdir -p ios/Frameworks
+              rm -rf ios/Frameworks/llama.xcframework
+              cp -R "$RUNNER_TEMP/llama.xcframework.bak" ios/Frameworks/llama.xcframework
+            fi
+          fi
+
+          test -f ios/Podfile
+          test -d ios/Runner.xcodeproj
 
       - name: Ensure CMake available (required by llama.cpp build scripts)
         run: |
