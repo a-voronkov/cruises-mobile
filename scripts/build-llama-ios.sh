@@ -12,6 +12,11 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 LLAMA_DIR="$PROJECT_ROOT/build/llama.cpp"
 OUTPUT_DIR="$PROJECT_ROOT/ios/Frameworks"
 
+# Local persistent cache (useful for CI self-hosted runners)
+CACHE_ROOT="${LLAMA_CACHE_ROOT:-$HOME/.cache/cruises-mobile/llama}"
+CACHE_IOS_DIR="$CACHE_ROOT/ios/$LLAMA_VERSION"
+CACHED_XCFRAMEWORK="$CACHE_IOS_DIR/llama.xcframework"
+
 echo "llama.cpp version: $LLAMA_VERSION"
 echo "Project root: $PROJECT_ROOT"
 echo "Output directory: $OUTPUT_DIR"
@@ -20,6 +25,26 @@ echo "Output directory: $OUTPUT_DIR"
 if [[ "$OSTYPE" != "darwin"* ]]; then
     echo "Error: iOS build requires macOS"
     exit 1
+fi
+
+# Fast path: reuse locally cached artifact if present
+if [ -d "$CACHED_XCFRAMEWORK" ]; then
+    echo "Using cached llama.xcframework: $CACHED_XCFRAMEWORK"
+    mkdir -p "$OUTPUT_DIR"
+    rm -rf "$OUTPUT_DIR/llama.xcframework"
+    cp -R "$CACHED_XCFRAMEWORK" "$OUTPUT_DIR/"
+
+    if [ -d "$CACHE_IOS_DIR/MetalShaders" ]; then
+        rm -rf "$OUTPUT_DIR/MetalShaders"
+        cp -R "$CACHE_IOS_DIR/MetalShaders" "$OUTPUT_DIR/MetalShaders"
+    fi
+
+    echo ""
+    echo "========================================="
+    echo "✅ Reused cached iOS llama.cpp framework"
+    echo "========================================="
+    ls -lh "$OUTPUT_DIR/"
+    exit 0
 fi
 
 # Clone llama.cpp if not exists
@@ -100,6 +125,15 @@ if [ -f "$BUILD_DIR_IOS/bin/ggml-metal.metal" ]; then
     echo "Copying Metal shaders..."
     mkdir -p "$OUTPUT_DIR/MetalShaders"
     cp "$BUILD_DIR_IOS/bin/ggml-metal.metal" "$OUTPUT_DIR/MetalShaders/"
+fi
+
+# Save to local cache for subsequent runs
+echo "Saving llama.xcframework to local cache..."
+rm -rf "$CACHE_IOS_DIR"
+mkdir -p "$CACHE_IOS_DIR"
+cp -R "$OUTPUT_DIR/llama.xcframework" "$CACHE_IOS_DIR/llama.xcframework"
+if [ -d "$OUTPUT_DIR/MetalShaders" ]; then
+    cp -R "$OUTPUT_DIR/MetalShaders" "$CACHE_IOS_DIR/MetalShaders"
 fi
 
 echo ""

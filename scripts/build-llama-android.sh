@@ -12,9 +12,22 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 LLAMA_DIR="$PROJECT_ROOT/build/llama.cpp"
 OUTPUT_DIR="$PROJECT_ROOT/android/app/src/main/jniLibs"
 
+# Local persistent cache (useful for CI self-hosted runners)
+CACHE_ROOT="${LLAMA_CACHE_ROOT:-$HOME/.cache/cruises-mobile/llama}"
+CACHED_LIB="$CACHE_ROOT/android/$LLAMA_VERSION/arm64-v8a/libllama.so"
+
 echo "llama.cpp version: $LLAMA_VERSION"
 echo "Project root: $PROJECT_ROOT"
 echo "Output directory: $OUTPUT_DIR"
+
+# Fast path: reuse locally cached artifact if present
+if [ -f "$CACHED_LIB" ]; then
+    echo "Using cached libllama.so: $CACHED_LIB"
+    mkdir -p "$OUTPUT_DIR/arm64-v8a"
+    cp "$CACHED_LIB" "$OUTPUT_DIR/arm64-v8a/libllama.so"
+    echo "✅ Reused cached Android llama.cpp library"
+    exit 0
+fi
 
 # Check if Android NDK is available
 if [ -z "$ANDROID_NDK_HOME" ] && [ -z "$ANDROID_NDK" ]; then
@@ -58,12 +71,18 @@ cmake .. \
     -DLLAMA_BUILD_SERVER=OFF \
     -DCMAKE_BUILD_TYPE=Release
 
-cmake --build . --config Release -j$(nproc)
+CPU_COUNT=$(command -v nproc >/dev/null 2>&1 && nproc || sysctl -n hw.ncpu)
+cmake --build . --config Release -j$CPU_COUNT
 
 # Copy library to Flutter project
 echo "Copying libllama.so to Flutter project..."
 mkdir -p "$OUTPUT_DIR/arm64-v8a"
 cp libllama.so "$OUTPUT_DIR/arm64-v8a/"
+
+# Save to local cache for subsequent runs
+echo "Saving libllama.so to local cache..."
+mkdir -p "$(dirname "$CACHED_LIB")"
+cp libllama.so "$CACHED_LIB"
 
 cd "$LLAMA_DIR"
 

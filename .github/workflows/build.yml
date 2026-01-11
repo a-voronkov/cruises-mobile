@@ -36,33 +36,20 @@ jobs:
   setup:
     name: Setup Dependencies & Tools
     runs-on: self-hosted
-    outputs:
-      cache-hit-flutter: ${{ steps.cache-flutter.outputs.cache-hit }}
-      cache-hit-pub: ${{ steps.cache-pub.outputs.cache-hit }}
-      cache-hit-generated: ${{ steps.cache-generated.outputs.cache-hit }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Cache Flutter SDK
-      - name: Cache Flutter SDK
-        id: cache-flutter
-        uses: actions/cache@v4
-        with:
-          path: ~/flutter
-          key: flutter-${{ runner.os }}-${{ env.FLUTTER_VERSION }}
-          restore-keys: |
-            flutter-${{ runner.os }}-
-
-      # Install Flutter if not cached
-      - name: Install Flutter
-        if: steps.cache-flutter.outputs.cache-hit != 'true'
+      # Self-hosted runners are persistent: prefer using existing Flutter SDK on disk
+      # and only update when FLUTTER_VERSION changes.
+      - name: Ensure Flutter installed (reuse runner state)
         run: |
-          if [ ! -d "$HOME/flutter/bin" ]; then
+          if [ ! -d "$HOME/flutter/.git" ]; then
             git clone https://github.com/flutter/flutter.git -b stable $HOME/flutter
           fi
           cd $HOME/flutter
+          git fetch --tags
           git checkout ${{ env.FLUTTER_VERSION }}
 
       # Add Flutter to PATH
@@ -75,49 +62,12 @@ jobs:
       - name: Flutter Doctor
         run: flutter doctor -v
 
-      # Cache Pub dependencies
-      - name: Cache Pub dependencies
-        id: cache-pub
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pub-cache
-            .dart_tool
-          key: pub-${{ runner.os }}-${{ hashFiles('**/pubspec.lock') }}
-          restore-keys: |
-            pub-${{ runner.os }}-
-
       # Get Flutter dependencies
       - name: Get Flutter dependencies
         run: flutter pub get
 
-      # Cache generated code
-      - name: Cache generated code
-        id: cache-generated
-        uses: actions/cache@v4
-        with:
-          path: |
-            **/*.g.dart
-            **/*.freezed.dart
-            **/*.config.dart
-          key: generated-${{ runner.os }}-${{ hashFiles('**/pubspec.lock', 'lib/**/*.dart') }}
-          restore-keys: |
-            generated-${{ runner.os }}-
-
-      # If cache reports a hit but no generated files are present (e.g. empty/old cache),
-      # ensure we still generate them so downstream jobs can download the artifact.
-      - name: Check generated code present
-        id: check-generated
-        run: |
-          if find lib -type f \( -name "*.g.dart" -o -name "*.freezed.dart" -o -name "*.config.dart" \) -print -quit | grep -q .; then
-            echo "present=true" >> $GITHUB_OUTPUT
-          else
-            echo "present=false" >> $GITHUB_OUTPUT
-          fi
-
-      # Run code generation if not cached OR if generated files are missing
+      # Code generation (kept as a setup step so Android/iOS jobs don't duplicate work)
       - name: Run code generation
-        if: steps.cache-generated.outputs.cache-hit != 'true' || steps.check-generated.outputs.present != 'true'
         run: flutter pub run build_runner build --delete-conflicting-outputs
 
       # Upload generated code as artifact for build jobs
@@ -152,29 +102,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Restore Flutter SDK from cache
-      - name: Restore Flutter SDK
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/flutter
-          key: flutter-${{ runner.os }}-${{ env.FLUTTER_VERSION }}
-          fail-on-cache-miss: true
-
       # Add Flutter to PATH
       - name: Add Flutter to PATH
         run: |
           echo "$HOME/flutter/bin" >> $GITHUB_PATH
           echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
 
-      # Restore Pub dependencies
-      - name: Restore Pub dependencies
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.pub-cache
-            .dart_tool
-          key: pub-${{ runner.os }}-${{ hashFiles('**/pubspec.lock') }}
-          fail-on-cache-miss: true
+      - name: Verify Flutter on runner
+        run: |
+          if [ ! -x "$HOME/flutter/bin/flutter" ]; then
+            echo "❌ Flutter not found at $HOME/flutter/bin/flutter"
+            exit 1
+          fi
 
       # Download generated code from setup job
       - name: Download generated code
@@ -189,33 +128,9 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: ${{ env.JAVA_VERSION }}
-          cache: 'gradle'
 
-      # Cache Gradle dependencies
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-            android/.gradle
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
-      # Cache llama.cpp Android libraries
-      - name: Cache llama.cpp Android libraries
-        id: cache-llama-android
-        uses: actions/cache@v4
-        with:
-          path: android/app/src/main/jniLibs
-          key: llama-android-${{ hashFiles('scripts/llama-version.txt') }}
-          restore-keys: |
-            llama-android-
-
-      # Build llama.cpp for Android if not cached
-      - name: Build llama.cpp for Android
-        if: steps.cache-llama-android.outputs.cache-hit != 'true'
+      # Build (or reuse local runner cache) llama.cpp for Android
+      - name: Ensure llama.cpp Android library
         run: |
           chmod +x scripts/build-llama-android.sh
           bash scripts/build-llama-android.sh
@@ -272,29 +187,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Restore Flutter SDK from cache
-      - name: Restore Flutter SDK
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/flutter
-          key: flutter-${{ runner.os }}-${{ env.FLUTTER_VERSION }}
-          fail-on-cache-miss: true
-
       # Add Flutter to PATH
       - name: Add Flutter to PATH
         run: |
           echo "$HOME/flutter/bin" >> $GITHUB_PATH
           echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
 
-      # Restore Pub dependencies
-      - name: Restore Pub dependencies
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.pub-cache
-            .dart_tool
-          key: pub-${{ runner.os }}-${{ hashFiles('**/pubspec.lock') }}
-          fail-on-cache-miss: true
+      - name: Verify Flutter on runner
+        run: |
+          if [ ! -x "$HOME/flutter/bin/flutter" ]; then
+            echo "❌ Flutter not found at $HOME/flutter/bin/flutter"
+            exit 1
+          fi
 
       # Download generated code from setup job
       - name: Download generated code
@@ -303,31 +207,8 @@ jobs:
           name: generated-code
           path: .
 
-      # Cache CocoaPods
-      - name: Cache CocoaPods
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/Library/Caches/CocoaPods
-            ios/Pods
-            ios/Podfile.lock
-          key: pods-${{ runner.os }}-${{ hashFiles('**/Podfile.lock') }}
-          restore-keys: |
-            pods-${{ runner.os }}-
-
-      # Cache llama.cpp iOS libraries
-      - name: Cache llama.cpp iOS libraries
-        id: cache-llama-ios
-        uses: actions/cache@v4
-        with:
-          path: ios/Frameworks/llama.xcframework
-          key: llama-ios-${{ hashFiles('scripts/llama-version.txt') }}
-          restore-keys: |
-            llama-ios-
-
-      # Build llama.cpp for iOS if not cached
-      - name: Build llama.cpp for iOS
-        if: steps.cache-llama-ios.outputs.cache-hit != 'true'
+      # Build (or reuse local runner cache) llama.cpp for iOS
+      - name: Ensure llama.cpp for iOS
         run: |
           chmod +x scripts/build-llama-ios.sh
           bash scripts/build-llama-ios.sh
@@ -350,7 +231,7 @@ jobs:
       - name: Install CocoaPods dependencies
         run: |
           cd ios
-          pod install --repo-update
+          pod install
 
       # Build iOS (no codesign for now)
       - name: Build iOS (no codesign)
