@@ -81,7 +81,6 @@ class LlamaService {
         ..penaltyRepeat = AppConstants.repetitionPenalty
         ..penaltyFreq = 0.0
         ..penaltyPresent = 0.0
-        ..mirostat = 0
         ..mirostatTau = 5.0
         ..mirostatEta = 0.1
         ..penaltyNewline = false
