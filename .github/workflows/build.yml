@@ -218,9 +218,13 @@ jobs:
       - name: Fix Android env vars (ANDROID_SDK_HOME vs ANDROID_USER_HOME)
         run: |
           # If both ANDROID_SDK_HOME and ANDROID_USER_HOME are set, AGP fails.
-          # Keep ANDROID_USER_HOME (recommended) and clear ANDROID_SDK_HOME (deprecated).
+          # Keep ANDROID_USER_HOME (recommended) and ensure ANDROID_SDK_HOME (deprecated)
+          # points to the same location (some tooling treats empty as a different path).
           # See: https://developer.android.com/tools/variables
-          echo "ANDROID_SDK_HOME=" >> $GITHUB_ENV
+          ANDROID_PREFS_DIR="$HOME/.android"
+          mkdir -p "$ANDROID_PREFS_DIR"
+          echo "ANDROID_USER_HOME=$ANDROID_PREFS_DIR" >> $GITHUB_ENV
+          echo "ANDROID_SDK_HOME=$ANDROID_PREFS_DIR" >> $GITHUB_ENV
 
       - name: Ensure Android NDK installed
         run: |
@@ -352,6 +356,12 @@ jobs:
           if [ ! -f "ios/Podfile" ] || [ ! -d "ios/Runner.xcodeproj" ]; then
             echo "⚠️  iOS project scaffold missing (Podfile or Runner.xcodeproj). Regenerating via flutter create..."
 
+            # Ensure flutter create uses a valid Dart package name (dir name may contain '-').
+            PROJECT_NAME="$(awk -F': *' '/^name:/{print $2; exit}' pubspec.yaml)"
+            if [ -z "$PROJECT_NAME" ]; then
+              PROJECT_NAME="cruises_mobile"
+            fi
+
             # Preserve any custom Info.plist committed in the repo.
             if [ -f "ios/Runner/Info.plist" ]; then
               cp "ios/Runner/Info.plist" "$RUNNER_TEMP/Info.plist.bak"
@@ -365,7 +375,8 @@ jobs:
 
             # Try without overwrite first (safer), but fall back to overwrite if the tool
             # refuses due to missing .metadata or non-empty directory.
-            flutter create --platforms=ios --no-pub . || flutter create --platforms=ios --no-pub --overwrite .
+            flutter create --platforms=ios --no-pub --project-name "$PROJECT_NAME" . \
+              || flutter create --platforms=ios --no-pub --project-name "$PROJECT_NAME" --overwrite .
 
             if [ -f "$RUNNER_TEMP/Info.plist.bak" ]; then
               cp "$RUNNER_TEMP/Info.plist.bak" "ios/Runner/Info.plist"
