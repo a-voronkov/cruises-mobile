@@ -34,7 +34,6 @@ linter:
     # Style rules
     always_declare_return_types: true
     always_put_required_named_parameters_first: true
-    always_require_non_null_named_parameters: true
     annotate_overrides: true
     avoid_init_to_null: true
     avoid_null_checks_in_equality_operators: true

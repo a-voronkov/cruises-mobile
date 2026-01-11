@@ -57,51 +57,42 @@ class LlamaService {
 
       onProgress?.call(0.5);
 
+      // llama_cpp_dart's params are configured via mutable properties (not
+      // constructor named-args). Keep this compatible with older versions.
+      final modelParams = ModelParams()
+        ..nGpuLayers = 0 // CPU inference for now, can enable GPU later
+        ..vocabOnly = false
+        ..useMemorymap = true
+        ..useMemoryLock = false;
+
+      final contextParams = ContextParams()
+        ..nCtx = AppConstants.contextLength
+        ..nBatch = 512
+        ..nThreads = AppConstants.numThreads
+        ..nThreadsBatch = AppConstants.numThreads;
+
+      final samplingParams = SamplerParams()
+        ..temp = AppConstants.temperature
+        ..topK = AppConstants.topK
+        ..topP = AppConstants.topP
+        ..minP = 0.05
+        ..typical = 1.0
+        ..penaltyLastTokens = 64
+        ..penaltyRepeat = AppConstants.repetitionPenalty
+        ..penaltyFreq = 0.0
+        ..penaltyPresent = 0.0
+        ..mirostat = 0
+        ..mirostatTau = 5.0
+        ..mirostatEta = 0.1
+        ..penaltyNewline = false
+        ..seed = 0xFFFFFFFF;
+
       // Create load command with LFM2.5 optimized parameters
       final loadCommand = LlamaLoad(
         path: _modelPath!,
-        modelParams: ModelParams(
-          nGpuLayers: 0, // CPU inference for now, can enable GPU later
-          mainGpu: 0,
-          splitMode: 0,
-          vocabOnly: false,
-          useMmap: true,
-          useMlock: false,
-        ),
-        contextParams: ContextParams(
-          nCtx: AppConstants.contextLength,
-          nBatch: 512,
-          nThreads: AppConstants.numThreads,
-          nThreadsBatch: AppConstants.numThreads,
-          ropeFreqBase: 0.0,
-          ropeFreqScale: 0.0,
-          yarnExtFactor: -1.0,
-          yarnAttnFactor: 1.0,
-          yarnBetaFast: 32.0,
-          yarnBetaSlow: 1.0,
-          yarnOrigCtx: 0,
-          defragmentationThreshold: -1.0,
-          embeddings: false,
-          offloadKqv: true,
-          flashAttention: false,
-        ),
-        samplingParams: SamplerParams(
-          temperature: AppConstants.temperature,
-          topK: AppConstants.topK,
-          topP: AppConstants.topP,
-          minP: 0.05,
-          typicalP: 1.0,
-          penaltyLastN: 64,
-          penaltyRepeat: AppConstants.repetitionPenalty,
-          penaltyFreq: 0.0,
-          penaltyPresent: 0.0,
-          mirostat: 0,
-          mirostatTau: 5.0,
-          mirostatEta: 0.1,
-          penalizeNl: false,
-          seed: 0xFFFFFFFF,
-          nPredict: AppConstants.maxTokens,
-        ),
+        modelParams: modelParams,
+        contextParams: contextParams,
+        samplingParams: samplingParams,
         format: ChatMLFormat(), // LFM2.5 uses ChatML-like format
       );
 
