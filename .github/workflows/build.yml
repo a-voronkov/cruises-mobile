@@ -116,7 +116,6 @@ jobs:
     # cache contamination when the machine default JDK changes (e.g. JDK 21 → classfile 65).
     env:
       GRADLE_OPTS: -Dorg.gradle.daemon=false
-      GRADLE_USER_HOME: ${{ runner.temp }}/gradle-jdk${{ env.JAVA_VERSION }}
 
     steps:
       - name: Checkout code
@@ -152,6 +151,11 @@ jobs:
 
       - name: Show Java version
         run: java -version
+
+      - name: Configure isolated Gradle cache
+        run: |
+          echo "GRADLE_USER_HOME=${RUNNER_TEMP}/gradle-jdk${{ env.JAVA_VERSION }}" >> "$GITHUB_ENV"
+          echo "Using GRADLE_USER_HOME=${RUNNER_TEMP}/gradle-jdk${{ env.JAVA_VERSION }}"
 
       # Ensure Android SDK + sdkmanager are available (self-hosted runner might not export env vars)
       - name: Setup Android SDK
