@@ -154,7 +154,9 @@ jobs:
 
       - name: Configure isolated Gradle cache
         run: |
-          GRADLE_HOME="${RUNNER_TEMP}/gradle-jdk${{ env.JAVA_VERSION }}"
+          # Use a per-run Gradle user home to avoid reusing compiled script caches that may have
+          # been produced by a different JDK on the persistent self-hosted runner.
+          GRADLE_HOME="${RUNNER_TEMP}/gradle-${{ github.run_id }}-${{ github.run_attempt }}-jdk${{ env.JAVA_VERSION }}"
           echo "GRADLE_USER_HOME=$GRADLE_HOME" >> "$GITHUB_ENV"
           echo "ORG_GRADLE_JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
           echo "Using GRADLE_USER_HOME=$GRADLE_HOME"
