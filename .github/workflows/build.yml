@@ -2,7 +2,7 @@ name: Build and Release
 
 # Optimized CI/CD workflow with intelligent caching
 #
-# Trigger: Manual workflow dispatch only (via GitHub Actions UI)
+# Trigger: Automatic on every push to main + manual workflow dispatch (via GitHub Actions UI)
 #
 # Architecture:
 #   setup → build-android ↘
@@ -10,7 +10,7 @@ name: Build and Release
 #   setup → build-ios     ↗
 #
 # Key features:
-# - Manual trigger only - no automatic builds on push/PR
+# - Runs on every push to main and can also be triggered manually
 # - Separate setup job for dependencies (cached intelligently)
 # - Parallel Android/iOS builds after setup
 # - Caches: Flutter SDK, Pub, Gradle, CocoaPods, llama.cpp, generated code
@@ -24,7 +24,10 @@ env:
   LANG: en_US.UTF-8
 
 on:
-  workflow_dispatch:  # Only manual trigger via GitHub Actions UI
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
   ################################################################################
