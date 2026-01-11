@@ -132,14 +132,23 @@ cmake --build . --config Release -j$CPU_COUNT
 echo "Copying libllama.so to Flutter project..."
 mkdir -p "$OUTPUT_DIR/arm64-v8a"
 
-SO_PATH="src/libllama.so"
-if [ ! -f "$SO_PATH" ]; then
-    echo "❌ Error: libllama.so not found at expected path: $BUILD_DIR/$SO_PATH"
+# llama.cpp output path varies by version/config (commonly src/ or bin/). Try known locations first.
+SO_PATH=""
+for candidate in "src/libllama.so" "bin/libllama.so" "libllama.so"; do
+    if [ -f "$candidate" ]; then
+        SO_PATH="$candidate"
+        break
+    fi
+done
+
+if [ -z "$SO_PATH" ]; then
+    echo "❌ Error: libllama.so not found (checked: src/, bin/, root)."
     echo "Listing possible libllama.so locations (up to depth 4):"
     find . -maxdepth 4 -name libllama.so -print || true
     exit 70
 fi
 
+echo "Found libllama.so at: $BUILD_DIR/$SO_PATH"
 cp "$SO_PATH" "$OUTPUT_DIR/arm64-v8a/libllama.so"
 
 # Save to local cache for subsequent runs
