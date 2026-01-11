@@ -282,8 +282,11 @@ jobs:
     # On self-hosted macOS runners the hosted default (/Users/runner/hostedtoolcache) may not exist.
     # Put toolcache next to the runner's _work directory: <runner_root>/_toolcache.
     env:
-      RUNNER_TOOL_CACHE: ${{ runner.workspace }}/../_toolcache
-      AGENT_TOOLSDIRECTORY: ${{ runner.workspace }}/../_toolcache
+
+      # `runner.workspace` is not a supported context; derive runner_root from `github.workspace`.
+      # github.workspace = <runner_root>/_work/<repo>/<repo>
+      RUNNER_TOOL_CACHE: ${{ github.workspace }}/../../../_toolcache
+      AGENT_TOOLSDIRECTORY: ${{ github.workspace }}/../../../_toolcache
 
     steps:
       - name: Checkout code
