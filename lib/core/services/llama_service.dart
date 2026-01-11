@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:llama_cpp_dart/llama_cpp_dart.dart';
 import 'package:path_provider/path_provider.dart';
 import '../constants/app_constants.dart';
@@ -32,7 +33,7 @@ class LlamaService {
   }) async {
     try {
       if (_isInitialized) {
-        print('LlamaService: Already initialized');
+        debugPrint('LlamaService: Already initialized');
         return true;
       }
 
@@ -43,7 +44,7 @@ class LlamaService {
       _modelPath = await _getModelPath(fileName);
 
       if (_modelPath == null || !await File(_modelPath!).exists()) {
-        print('LlamaService: Model file not found at $_modelPath');
+        debugPrint('LlamaService: Model file not found at $_modelPath');
         return false;
       }
 
@@ -104,11 +105,11 @@ class LlamaService {
       onProgress?.call(1.0);
 
       _isInitialized = true;
-      print('LlamaService: Initialized successfully with model: $_modelPath');
+      debugPrint('LlamaService: Initialized successfully with model: $_modelPath');
       return true;
     } catch (e, stackTrace) {
-      print('LlamaService: Initialization failed: $e');
-      print('Stack trace: $stackTrace');
+      debugPrint('LlamaService: Initialization failed: $e');
+      debugPrint('Stack trace: $stackTrace');
       _isInitialized = false;
       return false;
     }
@@ -158,7 +159,7 @@ class LlamaService {
       _llamaParent = null;
     }
     _isInitialized = false;
-    print('LlamaService: Disposed');
+    debugPrint('LlamaService: Disposed');
   }
 
   /// Get the full path to the model file
@@ -177,10 +178,10 @@ class LlamaService {
         return prodModelPath;
       }
 
-      print('LlamaService: Model not found in dev or prod paths');
+      debugPrint('LlamaService: Model not found in dev or prod paths');
       return null;
     } catch (e) {
-      print('LlamaService: Error getting model path: $e');
+      debugPrint('LlamaService: Error getting model path: $e');
       return null;
     }
   }

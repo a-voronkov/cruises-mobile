@@ -92,7 +92,7 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 final modelStatusProvider = FutureProvider<bool>((ref) async {
   // TODO: Implement actual model status check
   // For now, return false to show setup page
-  await Future.delayed(const Duration(seconds: 1));
+  await Future<void>.delayed(const Duration(seconds: 1));
   return false;
 });
 

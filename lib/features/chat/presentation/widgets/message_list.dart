@@ -9,9 +9,9 @@ class MessageList extends ConsumerWidget {
   final ScrollController scrollController;
 
   const MessageList({
-    super.key,
-    this.conversationId,
     required this.scrollController,
+    this.conversationId,
+    super.key,
   });
 
   @override

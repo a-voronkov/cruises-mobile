@@ -24,11 +24,11 @@ class _ModelSetupPageState extends ConsumerState<ModelSetupPage> {
     // TODO: Implement actual download logic
     // Simulate download for now
     for (int i = 0; i <= 100; i++) {
-      await Future.delayed(const Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
       if (mounted) {
         setState(() {
           _downloadProgress = i / 100;
-          _statusMessage = 'Downloading model... ${i}%';
+          _statusMessage = 'Downloading model... $i%';
         });
       }
     }
@@ -39,7 +39,7 @@ class _ModelSetupPageState extends ConsumerState<ModelSetupPage> {
       });
 
       // Navigate to chat after a short delay
-      await Future.delayed(const Duration(seconds: 1));
+      await Future<void>.delayed(const Duration(seconds: 1));
       // TODO: Navigate to chat page
     }
   }

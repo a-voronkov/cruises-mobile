@@ -9,8 +9,8 @@ class MessageBubble extends StatelessWidget {
   final Message message;
 
   const MessageBubble({
-    super.key,
     required this.message,
+    super.key,
   });
 
   @override
@@ -95,10 +95,12 @@ class MessageBubble extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 8,
                       children: message.attachments!
-                          .map((attachment) => _buildAttachment(
-                                context,
-                                attachment,
-                              ))
+                          .map(
+                            (attachment) => _buildAttachment(
+                              context,
+                              attachment,
+                            ),
+                          )
                           .toList(),
                     ),
                   ),

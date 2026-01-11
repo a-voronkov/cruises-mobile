@@ -6,14 +6,15 @@ import '../../domain/entities/message.dart';
 /// Chat input widget with text, voice, and file support
 class ChatInput extends StatefulWidget {
   final TextEditingController controller;
-  final Function(String message, List<MessageAttachment>? attachments) onSend;
+  final void Function(String message, List<MessageAttachment>? attachments)
+      onSend;
   final VoidCallback onVoiceInput;
 
   const ChatInput({
-    super.key,
     required this.controller,
     required this.onSend,
     required this.onVoiceInput,
+    super.key,
   });
 
   @override
@@ -197,7 +198,7 @@ class _ChatInputState extends State<ChatInput> {
   }
 
   void _showAttachmentOptions(BuildContext context) {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       builder: (context) => SafeArea(
         child: Column(
