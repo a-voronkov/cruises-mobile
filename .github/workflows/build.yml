@@ -112,6 +112,12 @@ jobs:
     runs-on: self-hosted
     needs: setup
 
+    # Self-hosted runners are persistent; isolate Gradle state per Java version to avoid
+    # cache contamination when the machine default JDK changes (e.g. JDK 21 → classfile 65).
+    env:
+      GRADLE_OPTS: -Dorg.gradle.daemon=false
+      GRADLE_USER_HOME: ${{ runner.temp }}/gradle-jdk${{ env.JAVA_VERSION }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -143,6 +149,9 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Show Java version
+        run: java -version
 
       # Ensure Android SDK + sdkmanager are available (self-hosted runner might not export env vars)
       - name: Setup Android SDK
@@ -290,6 +299,21 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Detect CocoaPods
+        id: detect_pod
+        run: |
+          if command -v pod >/dev/null 2>&1; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Ruby (for CocoaPods)
+        if: steps.detect_pod.outputs.present != 'true'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+
       # Install CocoaPods dependencies
       - name: Install CocoaPods dependencies
         run: |
@@ -299,9 +323,8 @@ jobs:
               echo "❌ RubyGems (gem) not found on runner; cannot install CocoaPods"
               exit 1
             fi
-            # Ruby 2.6 on some self-hosted runners can't install latest ffi (requires Ruby >= 3.0).
-            # Preinstall the latest ffi that still supports Ruby 2.6 so CocoaPods install succeeds.
-            gem install --user-install ffi -v 1.17.3 -N
+            # Use a modern Ruby (via ruby/setup-ruby) to avoid ffi/CocoaPods install failures on
+            # older system Rubies on persistent self-hosted runners.
             gem install --user-install cocoapods -N
             POD_BIN_DIR="$(ruby -e 'print Gem.user_dir')/bin"
             echo "$POD_BIN_DIR" >> "$GITHUB_PATH"
