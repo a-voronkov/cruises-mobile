@@ -48,7 +48,10 @@ dependencies:
   json_annotation: ^4.8.1
 
   # LLM Integration - llama.cpp for on-device inference
-  llama_cpp_dart: ^0.2.2
+  # NOTE: CI runner uses Flutter 3.19.0 (Dart 3.3.0). Newer llama_cpp_dart
+  # versions pull in `ffi ^2.1.4` which requires Dart >=3.7.
+  # Keep this on 0.0.9 until Flutter is upgraded.
+  llama_cpp_dart: ^0.0.9
   ffi: ^2.1.2
 
 # Flutter 3.19.0 pins `meta` to 1.11.0, but llama_cpp_dart -> typed_isolate
