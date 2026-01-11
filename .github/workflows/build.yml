@@ -215,16 +215,23 @@ jobs:
         uses: android-actions/setup-android@v3
 
       # Fix conflicting Android environment variables
-      - name: Fix Android env vars (ANDROID_SDK_HOME vs ANDROID_USER_HOME)
+      - name: Fix Android env vars (unset ANDROID_SDK_HOME, keep only ANDROID_USER_HOME)
         run: |
-          # If both ANDROID_SDK_HOME and ANDROID_USER_HOME are set, AGP fails.
-          # Keep ANDROID_USER_HOME (recommended) and ensure ANDROID_SDK_HOME (deprecated)
-          # points to the same location (some tooling treats empty as a different path).
+          # AGP fails if BOTH ANDROID_SDK_HOME and ANDROID_USER_HOME are set, even to the
+          # same path. The fix is to unset ANDROID_SDK_HOME completely and use only
+          # ANDROID_USER_HOME (the recommended modern variable).
           # See: https://developer.android.com/tools/variables
+          #
+          # We cannot truly "unset" an env var from $GITHUB_ENV, but we can override it to
+          # empty in the current step and ensure subsequent steps don't see it by NOT
+          # exporting it. However, the runner's shell profile may re-export it.
+          #
+          # The cleanest fix: unset it in the shell before running Gradle.
+          # We'll set a marker variable and handle it in the Build APK step.
           ANDROID_PREFS_DIR="$HOME/.android"
           mkdir -p "$ANDROID_PREFS_DIR"
           echo "ANDROID_USER_HOME=$ANDROID_PREFS_DIR" >> $GITHUB_ENV
-          echo "ANDROID_SDK_HOME=$ANDROID_PREFS_DIR" >> $GITHUB_ENV
+          # Do NOT set ANDROID_SDK_HOME here. We'll unset it in the build step.
 
       - name: Ensure Android NDK installed
         run: |
@@ -278,7 +285,11 @@ jobs:
           # Force Flutter/Gradle to use the JDK installed by actions/setup-java.
           export JAVA_HOME="$JDK_HOME"
           export PATH="$JAVA_HOME/bin:$PATH"
+          # Unset ANDROID_SDK_HOME to avoid AGP conflict with ANDROID_USER_HOME
+          unset ANDROID_SDK_HOME
           echo "JAVA_HOME(used)=$JAVA_HOME"
+          echo "ANDROID_USER_HOME=$ANDROID_USER_HOME"
+          echo "ANDROID_SDK_HOME is unset"
           java -version
           flutter build apk --release --verbose
 
@@ -287,6 +298,8 @@ jobs:
         run: |
           export JAVA_HOME="$JDK_HOME"
           export PATH="$JAVA_HOME/bin:$PATH"
+          # Unset ANDROID_SDK_HOME to avoid AGP conflict with ANDROID_USER_HOME
+          unset ANDROID_SDK_HOME
           echo "JAVA_HOME(used)=$JAVA_HOME"
           java -version
           flutter build appbundle --release --verbose
@@ -373,10 +386,13 @@ jobs:
               cp -R "ios/Frameworks/llama.xcframework" "$RUNNER_TEMP/llama.xcframework.bak"
             fi
 
-            # Try without overwrite first (safer), but fall back to overwrite if the tool
-            # refuses due to missing .metadata or non-empty directory.
-            flutter create --platforms=ios --no-pub --project-name "$PROJECT_NAME" . \
-              || flutter create --platforms=ios --no-pub --project-name "$PROJECT_NAME" --overwrite .
+            # flutter create may return non-zero even on success (warnings, etc).
+            # We ignore exit code and check for the required files afterward.
+            flutter create --platforms=ios --no-pub --project-name "$PROJECT_NAME" . || true
+            # If first attempt didn't create files, try with --overwrite
+            if [ ! -f "ios/Podfile" ] || [ ! -d "ios/Runner.xcodeproj" ]; then
+              flutter create --platforms=ios --no-pub --project-name "$PROJECT_NAME" --overwrite . || true
+            fi
 
             if [ -f "$RUNNER_TEMP/Info.plist.bak" ]; then
               cp "$RUNNER_TEMP/Info.plist.bak" "ios/Runner/Info.plist"
@@ -389,8 +405,16 @@ jobs:
             fi
           fi
 
-          test -f ios/Podfile
-          test -d ios/Runner.xcodeproj
+          # Final check - fail if required files are still missing
+          if [ ! -f "ios/Podfile" ]; then
+            echo "❌ ios/Podfile still missing after flutter create"
+            exit 1
+          fi
+          if [ ! -d "ios/Runner.xcodeproj" ]; then
+            echo "❌ ios/Runner.xcodeproj still missing after flutter create"
+            exit 1
+          fi
+          echo "✅ iOS project scaffold is ready"
 
       - name: Ensure CMake available (required by llama.cpp build scripts)
         run: |
@@ -545,35 +569,56 @@ jobs:
           cd ios
           pod install
 
-      # Build iOS (no codesign for now)
-      - name: Build iOS (no codesign)
+      # Build iOS for Simulator (Debug mode for simulator compatibility)
+      - name: Build iOS Simulator app
+        run: |
+          # Build for iOS Simulator (arm64 for M1/M2 Macs)
+          flutter build ios --simulator --debug
+          echo "✅ iOS Simulator build complete"
+          ls -la build/ios/iphonesimulator/ || true
+
+      # Also build release for device (no codesign) - useful for reference
+      - name: Build iOS Device (no codesign)
         run: flutter build ios --release --no-codesign
 
-      # For signed builds, configure certificates and provisioning profiles
-      # - name: Build iOS IPA
-      #   run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+      # Create a zip of the simulator app for easier download
+      - name: Package iOS Simulator app
+        run: |
+          cd build/ios/iphonesimulator
+          zip -r Runner-Simulator.app.zip Runner.app
+          mv Runner-Simulator.app.zip ../../../
+          echo "✅ Packaged iOS Simulator app"
 
-      # Upload iOS build artifact
-      - name: Upload iOS build artifact
+      # Upload iOS Simulator build artifact
+      - name: Upload iOS Simulator artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-build
+          name: ios-simulator
+          path: Runner-Simulator.app.zip
+          retention-days: 30
+
+      # Upload iOS Device build artifact
+      - name: Upload iOS Device artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-device
           path: build/ios/iphoneos/Runner.app
           retention-days: 30
 
   ################################################################################
-  # CREATE RELEASE - Create GitHub release with artifacts
+  # CREATE RELEASE - Create GitHub release with artifacts (auto on every push)
   ################################################################################
   create-release:
     name: Create Release
     needs: [build-android, build-ios]
     runs-on: self-hosted
-    # Always create release on manual workflow dispatch
-    if: github.event_name == 'workflow_dispatch'
+    # Create release on EVERY successful build (push to main or manual dispatch)
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history to count releases
 
       # Download Android APK
       - name: Download Android APK
@@ -589,39 +634,62 @@ jobs:
           name: android-aab
           path: ./artifacts
 
-      # Download iOS build
-      - name: Download iOS build
+      # Download iOS Simulator build
+      - name: Download iOS Simulator build
         uses: actions/download-artifact@v4
         with:
-          name: ios-build
+          name: ios-simulator
           path: ./artifacts
 
-      # Determine release tag (use run number for manual builds)
-      - name: Determine release tag
+      # Determine release version (0.001, 0.002, 0.003, ...)
+      - name: Determine release version
         id: release-tag
         run: |
-          # For manual workflow dispatch, use run number
-          echo "tag=v${{ github.run_number }}" >> $GITHUB_OUTPUT
+          # Count existing releases to determine next version number
+          # Using GitHub API to get release count
+          RELEASE_COUNT=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases" | \
+            grep -c '"tag_name"' || echo "0")
+
+          # Next version is count + 1, formatted as 0.XXX
+          NEXT_NUM=$((RELEASE_COUNT + 1))
+          VERSION=$(printf "0.%03d" $NEXT_NUM)
+
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Next release version: v${VERSION}"
 
       # Create Release
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.release-tag.outputs.tag }}
-          name: Release ${{ steps.release-tag.outputs.tag }}
+          name: Release ${{ steps.release-tag.outputs.version }}
           draft: false
           prerelease: false
           body: |
-            ## 🚀 Release ${{ steps.release-tag.outputs.tag }}
+            ## 🚀 Release ${{ steps.release-tag.outputs.version }}
 
-            **Build Type:** Manual workflow dispatch
+            **Build Type:** ${{ github.event_name == 'workflow_dispatch' && 'Manual' || 'Automatic' }}
             **Branch:** ${{ github.ref_name }}
             **Commit:** ${{ github.sha }}
 
             ### 📦 Artifacts
-            - **Android APK**: `app-release.apk` - Ready for direct installation
-            - **Android AAB**: `app-release.aab` - For Google Play Store
-            - **iOS Build**: `Runner.app` - Requires signing for deployment
+            - **Android APK**: `app-release.apk` - Ready for direct installation on Android devices
+            - **Android AAB**: `app-release.aab` - For Google Play Store (requires signing)
+            - **iOS Simulator**: `Runner-Simulator.app.zip` - For running on iOS Simulator (M1/M2 Mac)
+
+            ### 📱 Installation
+            **Android:**
+            1. Download `app-release.apk`
+            2. Enable "Install from unknown sources" on your device
+            3. Open the APK file to install
+
+            **iOS Simulator (Mac M1/M2):**
+            1. Download `Runner-Simulator.app.zip`
+            2. Unzip the file
+            3. Open iOS Simulator
+            4. Drag `Runner.app` onto the Simulator window
 
             ### 📝 Changes
             See commit history for details: https://github.com/${{ github.repository }}/commits/${{ github.sha }}
@@ -630,7 +698,6 @@ jobs:
             - Flutter ${{ env.FLUTTER_VERSION }}
             - Java ${{ env.JAVA_VERSION }}
             - llama.cpp (version: see `scripts/llama-version.txt`)
-            - LFM2.5-1.2B-Instruct model
 
             ### ⏱️ Build Information
             - Workflow Run: #${{ github.run_number }}
@@ -638,6 +705,7 @@ jobs:
           files: |
             ./artifacts/app-release.apk
             ./artifacts/app-release.aab
+            ./artifacts/Runner-Simulator.app.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -649,7 +717,9 @@ jobs:
           echo "### 📦 Artifacts" >> $GITHUB_STEP_SUMMARY
           echo "- Android APK: $(ls -lh ./artifacts/app-release.apk | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
           echo "- Android AAB: $(ls -lh ./artifacts/app-release.aab | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
+          echo "- iOS Simulator: $(ls -lh ./artifacts/Runner-Simulator.app.zip | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🏷️ Release" >> $GITHUB_STEP_SUMMARY
+          echo "Version: ${{ steps.release-tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "Tag: ${{ steps.release-tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
 
