@@ -550,34 +550,35 @@ jobs:
       #     name: ios-simulator
       #     path: ./artifacts
 
-      # Determine release version (0.001, 0.002, 0.003, ...)
+      # Determine release version from pubspec.yaml
       - name: Determine release version
         id: release-tag
         run: |
-          # Count existing releases to determine next version number
-          # Using GitHub API to get release count
-          RELEASE_COUNT=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/releases" | \
-            grep -c '"tag_name"' || echo "0")
+          # Extract version from pubspec.yaml (format: version: X.Y.Z+build)
+          FULL_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//' | tr -d '\r')
+          # Split into version and build number
+          VERSION=$(echo "$FULL_VERSION" | cut -d'+' -f1)
+          BUILD_NUMBER=$(echo "$FULL_VERSION" | cut -d'+' -f2)
 
-          # Next version is count + 1, formatted as 0.XXX
-          NEXT_NUM=$((RELEASE_COUNT + 1))
-          VERSION=$(printf "0.%03d" $NEXT_NUM)
+          echo "Full version from pubspec: $FULL_VERSION"
+          echo "Version: $VERSION"
+          echo "Build number: $BUILD_NUMBER"
 
           echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Next release version: v${VERSION}"
+          echo "build_number=${BUILD_NUMBER}" >> $GITHUB_OUTPUT
+          echo "Release version: v${VERSION} (build ${BUILD_NUMBER})"
 
       # Create Release
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.release-tag.outputs.tag }}
-          name: Release ${{ steps.release-tag.outputs.version }}
+          name: Release ${{ steps.release-tag.outputs.version }} (build ${{ steps.release-tag.outputs.build_number }})
           draft: false
           prerelease: false
           body: |
-            ## 🚀 Release ${{ steps.release-tag.outputs.version }}
+            ## 🚀 Release ${{ steps.release-tag.outputs.version }} (build ${{ steps.release-tag.outputs.build_number }})
 
             **Build Type:** ${{ github.event_name == 'workflow_dispatch' && 'Manual' || 'Automatic' }}
             **Branch:** ${{ github.ref_name }}

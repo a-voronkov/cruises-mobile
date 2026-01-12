@@ -18,7 +18,6 @@ class SettingsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
-    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -89,7 +88,7 @@ class SettingsPage extends ConsumerWidget {
   }
 
   void _showThemeDialog(BuildContext context, WidgetRef ref, ThemeMode currentMode) {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Choose theme'),
@@ -158,7 +157,7 @@ class SettingsPage extends ConsumerWidget {
   }
 
   void _showDeleteModelDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete model?'),
@@ -196,7 +195,7 @@ class SettingsPage extends ConsumerWidget {
   }
 
   void _showRedownloadDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Re-download model?'),
@@ -239,7 +238,7 @@ class SettingsPage extends ConsumerWidget {
   }
 
   void _showClearDataDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Clear all data?'),

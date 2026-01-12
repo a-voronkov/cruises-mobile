@@ -44,9 +44,9 @@ class ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
                 // TODO: Show conversations list
                 break;
               case 'settings':
-                Navigator.push(
+                Navigator.push<void>(
                   context,
-                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+                  MaterialPageRoute<void>(builder: (_) => const SettingsPage()),
                 );
                 break;
               case 'about':

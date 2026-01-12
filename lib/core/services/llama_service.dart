@@ -33,7 +33,7 @@ class LlamaService {
     void Function(double progress)? onProgress,
   }) async {
     // Diagnostic info collected during initialization
-    Map<String, dynamic> diagnostics = {};
+    Map<String, Object> diagnostics = {};
 
     try {
       if (_isInitialized) {
@@ -189,7 +189,7 @@ class LlamaService {
   }
 
   /// Report diagnostics to Bugsnag for debugging
-  Future<void> _reportDiagnostics(String message, Map<String, dynamic> diagnostics) async {
+  Future<void> _reportDiagnostics(String message, Map<String, Object> diagnostics) async {
     await bugsnag.notify(
       Exception(message),
       StackTrace.current,
