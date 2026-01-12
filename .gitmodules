@@ -1,0 +1,3 @@
+[submodule "cruises-backend"]
+	path = cruises-backend
+	url = https://github.com/a-voronkov/cruises.git
