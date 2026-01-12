@@ -14,7 +14,7 @@ if [ -z "$LLAMA_VERSION" ]; then
 fi
 
 # Build flags version - increment when cmake flags change to invalidate cache
-BUILD_FLAGS_VERSION="v3-opencl"
+BUILD_FLAGS_VERSION="v4-static-ggml"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -31,8 +31,8 @@ echo "Project root: $PROJECT_ROOT"
 echo "Output directory: $OUTPUT_DIR"
 
 # Fast path: reuse locally cached artifacts if present
-# Check for libllama.so and libggml.so (the two essential libraries)
-if [ -f "$CACHE_DIR/libllama.so" ] && [ -f "$CACHE_DIR/libggml.so" ]; then
+# With GGML_STATIC=ON, only libllama.so is essential (ggml is statically linked)
+if [ -f "$CACHE_DIR/libllama.so" ]; then
     echo "Using cached libraries from: $CACHE_DIR/"
     mkdir -p "$OUTPUT_DIR/arm64-v8a"
     # Copy all cached .so files
@@ -155,11 +155,15 @@ rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
+# Build with GGML_STATIC=ON to statically link ggml into libllama.so
+# This avoids the "dlopen failed: library libggml-cpu.so not found" error on Android
+# because all ggml code is embedded directly into libllama.so
 cmake .. \
     -DCMAKE_TOOLCHAIN_FILE="$NDK_PATH/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI=arm64-v8a \
     -DANDROID_PLATFORM=android-24 \
     -DBUILD_SHARED_LIBS=ON \
+    -DGGML_STATIC=ON \
     -DLLAMA_CURL=OFF \
     -DLLAMA_BUILD_TESTS=OFF \
     -DLLAMA_BUILD_EXAMPLES=OFF \
@@ -168,6 +172,7 @@ cmake .. \
     -DLLAMA_BUILD_COMMON=ON \
     -DGGML_NATIVE=OFF \
     -DGGML_OPENMP=OFF \
+    -DGGML_LLAMAFILE=OFF \
     -DGGML_OPENCL=ON \
     -DGGML_OPENCL_EMBED_KERNELS=ON \
     -DGGML_OPENCL_USE_ADRENO_KERNELS=ON \
@@ -202,16 +207,10 @@ find_lib() {
     find . -maxdepth 5 -name "$libname" -print -quit 2>/dev/null || true
 }
 
-# Copy all ggml libraries (dependencies of libllama.so)
-# With BUILD_SHARED_LIBS=ON, llama.cpp creates separate .so files for each component
-echo "Copying ggml libraries..."
-for ggml_lib in libggml.so libggml-base.so libggml-cpu.so libggml-opencl.so; do
-    GGML_PATH="$(find_lib $ggml_lib)"
-    if [ -n "$GGML_PATH" ] && [ -f "$GGML_PATH" ]; then
-        echo "  Found $ggml_lib at: $GGML_PATH"
-        cp "$GGML_PATH" "$OUTPUT_DIR/arm64-v8a/$ggml_lib"
-    fi
-done
+# With GGML_STATIC=ON, ggml is statically linked into libllama.so
+# No need to copy separate ggml libraries (libggml.so, libggml-cpu.so, etc.)
+# This avoids the "dlopen failed: library libggml-cpu.so not found" error on Android
+echo "Note: ggml is statically linked into libllama.so (GGML_STATIC=ON)"
 
 # Copy OpenCL stub library (required for GPU acceleration on Android)
 echo "Copying OpenCL library..."
