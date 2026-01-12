@@ -6,20 +6,32 @@ import '../../../../core/theme/app_colors.dart';
 
 /// Message bubble widget (ChatGPT-style)
 class MessageBubble extends StatelessWidget {
-  final Message message;
+  final Message? message;
+  final String? content;
+  final bool? isUser;
+  final DateTime? timestamp;
+  final bool isStreaming;
 
   const MessageBubble({
-    required this.message,
+    this.message,
+    this.content,
+    this.isUser,
+    this.timestamp,
+    this.isStreaming = false,
     super.key,
-  });
+  }) : assert(message != null || (content != null && isUser != null),
+            'Either message or content+isUser must be provided');
 
   @override
   Widget build(BuildContext context) {
-    final isUser = message.role == MessageRole.user;
+    final effectiveIsUser = isUser ?? (message?.role == MessageRole.user);
+    final effectiveContent = content ?? message?.content ?? '';
+    final effectiveTimestamp = timestamp ?? message?.timestamp;
+
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final backgroundColor = isUser
+    final backgroundColor = effectiveIsUser
         ? (isDark ? AppColors.userMessageDark : AppColors.userMessageLight)
         : (isDark ? AppColors.aiMessageDark : AppColors.aiMessageLight);
 
@@ -33,11 +45,11 @@ class MessageBubble extends StatelessWidget {
           // Avatar
           CircleAvatar(
             radius: 16,
-            backgroundColor: isUser
+            backgroundColor: effectiveIsUser
                 ? theme.colorScheme.primary
                 : theme.colorScheme.secondary,
             child: Icon(
-              isUser ? Icons.person : Icons.smart_toy,
+              effectiveIsUser ? Icons.person : Icons.smart_toy,
               size: 18,
               color: Colors.white,
             ),
@@ -49,19 +61,34 @@ class MessageBubble extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Role label
-                Text(
-                  isUser ? 'You' : 'Assistant',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.secondary,
-                  ),
+                // Role label with streaming indicator
+                Row(
+                  children: [
+                    Text(
+                      effectiveIsUser ? 'You' : 'Assistant',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.secondary,
+                      ),
+                    ),
+                    if (isStreaming) ...[
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.colorScheme.secondary,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 4),
 
                 // Message text with markdown support
                 MarkdownBody(
-                  data: message.content,
+                  data: effectiveContent,
                   styleSheet: MarkdownStyleSheet(
                     p: theme.textTheme.bodyLarge,
                     code: theme.textTheme.bodyMedium?.copyWith(
@@ -77,24 +104,26 @@ class MessageBubble extends StatelessWidget {
                   ),
                 ),
 
-                // Timestamp
-                const SizedBox(height: 4),
-                Text(
-                  _formatTimestamp(message.timestamp),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.secondary.withOpacity(0.6),
+                // Timestamp (only if available and not streaming)
+                if (effectiveTimestamp != null && !isStreaming) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatTimestamp(effectiveTimestamp),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.secondary.withOpacity(0.6),
+                    ),
                   ),
-                ),
+                ],
 
                 // Attachments (if any)
-                if (message.attachments != null &&
-                    message.attachments!.isNotEmpty)
+                if (message?.attachments != null &&
+                    message!.attachments!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: message.attachments!
+                      children: message!.attachments!
                           .map(
                             (attachment) => _buildAttachment(
                               context,
@@ -106,7 +135,7 @@ class MessageBubble extends StatelessWidget {
                   ),
 
                 // Status indicator for user messages
-                if (isUser && message.status == MessageStatus.sending)
+                if (effectiveIsUser && message?.status == MessageStatus.sending)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Row(

@@ -9,11 +9,13 @@ class ChatInput extends StatefulWidget {
   final void Function(String message, List<MessageAttachment>? attachments)
       onSend;
   final VoidCallback onVoiceInput;
+  final bool enabled;
 
   const ChatInput({
     required this.controller,
     required this.onSend,
     required this.onVoiceInput,
+    this.enabled = true,
     super.key,
   });
 
@@ -149,8 +151,9 @@ class _ChatInputState extends State<ChatInput> {
                 Expanded(
                   child: TextField(
                     controller: widget.controller,
-                    decoration: const InputDecoration(
-                      hintText: 'Message...',
+                    enabled: widget.enabled,
+                    decoration: InputDecoration(
+                      hintText: widget.enabled ? 'Message...' : 'AI is thinking...',
                       border: InputBorder.none,
                     ),
                     maxLines: null,

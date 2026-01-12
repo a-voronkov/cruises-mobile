@@ -1,5 +1,6 @@
 import '../constants/app_constants.dart';
 import '../../features/chat/domain/entities/message.dart';
+import '../../features/chat/presentation/providers/cruise_context_provider.dart';
 
 /// Chat template formatter for LFM2.5 model
 /// 
@@ -74,6 +75,61 @@ class ChatTemplate {
     buffer.write('\n');
     buffer.write(AppConstants.imStartToken);
     buffer.write('assistant\n');
+
+    return buffer.toString();
+  }
+
+  /// Format messages with cruise context for the system prompt
+  static String formatMessagesWithContext({
+    required List<Message> messages,
+    required CruiseContext cruiseContext,
+    bool addGenerationPrompt = true,
+  }) {
+    final buffer = StringBuffer();
+
+    // Start with BOS token
+    buffer.write(AppConstants.bosToken);
+
+    // Add system prompt with cruise context
+    buffer.write(AppConstants.imStartToken);
+    buffer.write('system\n');
+    buffer.write(_buildCruiseSystemPrompt(cruiseContext));
+    buffer.write(AppConstants.imEndToken);
+    buffer.write('\n');
+
+    // Add conversation messages (skip system messages and welcome)
+    for (final message in messages) {
+      if (message.role == MessageRole.system) continue;
+
+      buffer.write(AppConstants.imStartToken);
+      buffer.write(_roleToString(message.role));
+      buffer.write('\n');
+      buffer.write(message.content);
+      buffer.write(AppConstants.imEndToken);
+      buffer.write('\n');
+    }
+
+    // Add generation prompt for assistant response
+    if (addGenerationPrompt) {
+      buffer.write(AppConstants.imStartToken);
+      buffer.write('assistant\n');
+    }
+
+    return buffer.toString();
+  }
+
+  /// Build system prompt with cruise context
+  static String _buildCruiseSystemPrompt(CruiseContext context) {
+    final buffer = StringBuffer();
+
+    buffer.writeln('You are an offline cruise consultant assistant.');
+    buffer.writeln('You help passengers with their cruise experience, shore excursions, and travel planning.');
+    buffer.writeln('Be helpful, concise, and friendly.');
+    buffer.writeln('');
+    buffer.writeln('The user is going on a cruise. Here is their cruise information:');
+    buffer.writeln(context.toPromptString());
+    buffer.writeln('');
+    buffer.writeln('Language preference: ${context.language}');
 
     return buffer.toString();
   }
