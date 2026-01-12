@@ -163,3 +163,45 @@ class _ManualCruiseEntryPageState extends ConsumerState<ManualCruiseEntryPage> {
     }
   }
 
+  Future<void> _saveCruise() async {
+    // Validate form
+    if (!_formKey.currentState!.validate()) return;
+
+    // Validate dates
+    if (_startDate == null || _endDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select both start and end dates')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      final durationNights = _endDate!.difference(_startDate!).inDays;
+      final cruise = Cruise(
+        id: const Uuid().v4(),
+        name: '${_shipNameController.text} $durationNights-Night Cruise',
+        cruiseLine: _cruiseLineController.text,
+        shipName: _shipNameController.text,
+        startDate: _startDate!,
+        endDate: _endDate!,
+        durationNights: durationNights,
+        departurePort: _departurePortController.text,
+        roomNumber: _roomNumberController.text.isNotEmpty ? _roomNumberController.text : null,
+        roomType: _roomTypeController.text.isNotEmpty ? _roomTypeController.text : null,
+      );
+
+      await ref.read(cruiseNotifierProvider.notifier).saveCruise(cruise);
+      ref.read(cruiseNotifierProvider.notifier).setActiveCruise(cruise);
+
+      if (mounted) {
+        Navigator.of(context).pop(cruise);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+}
