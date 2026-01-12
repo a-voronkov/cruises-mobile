@@ -116,8 +116,8 @@ app.*.symbols
 *.safetensors
 *.pt
 *.pth
-models/
-!models/.gitkeep
+/models/
+!/models/.gitkeep
 
 # llama.cpp build artifacts
 build/llama.cpp/
