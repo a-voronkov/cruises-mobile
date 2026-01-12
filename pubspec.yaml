@@ -48,7 +48,7 @@ dependencies:
   json_annotation: ^4.8.1
 
   # Error Tracking
-  bugsnag_flutter: ^3.3.0
+  bugsnag_flutter: ^4.2.0
 
   # LLM Integration - llama.cpp for on-device inference
   # NOTE: CI runner uses Flutter 3.19.0 (Dart 3.3.0). Newer llama_cpp_dart
