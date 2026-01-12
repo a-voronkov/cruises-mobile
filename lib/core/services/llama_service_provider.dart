@@ -92,6 +92,7 @@ class ModelInitializationNotifier extends StateNotifier<ModelInitializationState
             'progress': state.progress,
             'stage': _getStageFromProgress(state.progress),
           });
+          return true;
         },
       );
 

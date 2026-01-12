@@ -121,6 +121,7 @@ class LlamaService {
             'modelPath': _modelPath ?? 'unknown',
             'stage': 'initialization',
           });
+          return true;
         },
       );
 
