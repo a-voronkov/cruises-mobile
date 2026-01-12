@@ -102,12 +102,14 @@ class LlamaService {
         ..seed = 0xFFFFFFFF;
 
       // Create load command with LFM2.5 optimized parameters
+      // Note: ChatML format is configured via ModelParams.formatter in llama_cpp_dart 0.2.x
+      modelParams.formatter = ChatMLFormat();
+
       final loadCommand = LlamaLoad(
         path: _modelPath!,
         modelParams: modelParams,
         contextParams: contextParams,
         samplingParams: samplingParams,
-        format: ChatMLFormat(), // LFM2.5 uses ChatML-like format
       );
 
       onProgress?.call(0.7);

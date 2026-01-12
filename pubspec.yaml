@@ -34,8 +34,8 @@ dependencies:
   shimmer: ^3.0.0
 
   # Media & Files
-  image_picker: ^1.0.7
-  file_picker: ^6.1.1
+  image_picker: ^1.1.2
+  file_picker: ^8.1.8
   speech_to_text: ^6.6.0
   permission_handler: ^11.2.0
 
