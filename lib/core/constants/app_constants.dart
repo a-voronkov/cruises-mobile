@@ -76,8 +76,12 @@ class AppConstants {
   static const Duration receiveTimeout = Duration(seconds: 30);
   static const int maxRetries = 3;
 
+  // API Configuration
+  static const String apiBaseUrl = 'https://cruises.voronkov.club/api';
+
   // Pagination
   static const int messagesPerPage = 50;
   static const int conversationsPerPage = 20;
+  static const int cruisesPerPage = 20;
 }
 

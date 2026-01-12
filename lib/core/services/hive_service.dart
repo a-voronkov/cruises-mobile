@@ -1,12 +1,14 @@
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import '../../features/chat/data/models/message_model.dart';
 import '../../features/chat/data/models/conversation_model.dart';
+import '../../features/cruise/data/models/cruise_model.dart';
 
 /// Box names for Hive storage
 class HiveBoxNames {
   static const String messages = 'messages';
   static const String conversations = 'conversations';
   static const String settings = 'settings';
+  static const String cruises = 'cruises';
 }
 
 /// Service for managing Hive initialization and adapters
@@ -52,6 +54,14 @@ class HiveService {
     if (!Hive.isAdapterRegistered(HiveTypeIds.conversationModel)) {
       Hive.registerAdapter(ConversationModelAdapter());
     }
+
+    // Cruise adapters
+    if (!Hive.isAdapterRegistered(CruiseHiveTypeIds.cruiseModel)) {
+      Hive.registerAdapter(CruiseModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(CruiseHiveTypeIds.portVisitModel)) {
+      Hive.registerAdapter(PortVisitModelAdapter());
+    }
   }
 
   /// Open all required Hive boxes
@@ -59,6 +69,7 @@ class HiveService {
     await Hive.openBox<MessageModel>(HiveBoxNames.messages);
     await Hive.openBox<ConversationModel>(HiveBoxNames.conversations);
     await Hive.openBox<dynamic>(HiveBoxNames.settings);
+    await Hive.openBox<CruiseModel>(HiveBoxNames.cruises);
   }
 
   /// Get messages box
@@ -73,6 +84,10 @@ class HiveService {
   static Box<dynamic> get settingsBox =>
       Hive.box<dynamic>(HiveBoxNames.settings);
 
+  /// Get cruises box
+  static Box<CruiseModel> get cruisesBox =>
+      Hive.box<CruiseModel>(HiveBoxNames.cruises);
+
   /// Close all boxes
   static Future<void> close() async {
     await Hive.close();
@@ -84,6 +99,7 @@ class HiveService {
     await messagesBox.clear();
     await conversationsBox.clear();
     await settingsBox.clear();
+    await cruisesBox.clear();
   }
 }
 
