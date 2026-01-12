@@ -218,9 +218,18 @@ class LlamaService {
 
   /// Get the platform-specific llama.cpp library path
   Future<String?> _getLibraryPath() async {
-    // The library should be bundled with the app
-    // For now, return null to use default library discovery
-    // TODO: Bundle llama.cpp library with the app
+    // llama_cpp_dart defaults to "libmtmd.so" on Android which is wrong.
+    // We need to explicitly set "libllama.so" as the main library.
+    // The libmtmd.so (multimodal) is optional and loaded separately by the library.
+    if (Platform.isAndroid) {
+      return 'libllama.so';
+    }
+    if (Platform.isIOS) {
+      // On iOS, the library is embedded in the app bundle
+      // llama_cpp_dart will find it via DynamicLibrary.process()
+      return null;
+    }
+    // Other platforms: use default discovery
     return null;
   }
 }
