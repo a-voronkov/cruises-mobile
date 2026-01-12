@@ -110,7 +110,6 @@ class ModelInitializationNotifier extends StateNotifier<ModelInitializationState
     if (progress < 1.0) return 'initializing_llama_parent';
     return 'completed';
   }
-  }
 
   /// Reset initialization state
   void reset() {
