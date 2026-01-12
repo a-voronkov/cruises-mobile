@@ -14,7 +14,7 @@ if [ -z "$LLAMA_VERSION" ]; then
 fi
 
 # Build flags version - increment when cmake flags change to invalidate cache
-BUILD_FLAGS_VERSION="v2-no-openmp"
+BUILD_FLAGS_VERSION="v3-opencl"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -99,6 +99,35 @@ fi
 
 echo "Using Android NDK: $NDK_PATH"
 
+# Setup OpenCL for GPU acceleration on Android
+OPENCL_DIR="$PROJECT_ROOT/build/opencl"
+OPENCL_HEADERS_DIR="$OPENCL_DIR/OpenCL-Headers"
+OPENCL_LIBS_DIR="$OPENCL_DIR/libs"
+
+setup_opencl() {
+    echo ""
+    echo "Setting up OpenCL for Android..."
+    mkdir -p "$OPENCL_DIR"
+
+    # Download OpenCL headers if not present
+    if [ ! -d "$OPENCL_HEADERS_DIR" ]; then
+        echo "Downloading OpenCL headers..."
+        git clone --depth 1 https://github.com/KhronosGroup/OpenCL-Headers.git "$OPENCL_HEADERS_DIR"
+    fi
+
+    # Download OpenCL stub library from llama_cpp_dart if not present
+    if [ ! -f "$OPENCL_LIBS_DIR/arm64-v8a/libOpenCL.so" ]; then
+        echo "Downloading OpenCL stub library..."
+        mkdir -p "$OPENCL_LIBS_DIR/arm64-v8a"
+        curl -L -o "$OPENCL_LIBS_DIR/arm64-v8a/libOpenCL.so" \
+            "https://github.com/netdur/llama_cpp_dart/raw/main/src/opencl-libs/android/arm64-v8a/libOpenCL.so"
+    fi
+
+    echo "OpenCL setup complete."
+}
+
+setup_opencl
+
 # Clone llama.cpp if not exists
 if [ ! -d "$LLAMA_DIR" ]; then
     echo "Cloning llama.cpp repository..."
@@ -139,6 +168,11 @@ cmake .. \
     -DLLAMA_BUILD_COMMON=ON \
     -DGGML_NATIVE=OFF \
     -DGGML_OPENMP=OFF \
+    -DGGML_OPENCL=ON \
+    -DGGML_OPENCL_EMBED_KERNELS=ON \
+    -DGGML_OPENCL_USE_ADRENO_KERNELS=ON \
+    -DOpenCL_INCLUDE_DIR="$OPENCL_HEADERS_DIR" \
+    -DOpenCL_LIBRARY="$OPENCL_LIBS_DIR/arm64-v8a/libOpenCL.so" \
     -DCMAKE_BUILD_TYPE=Release
 
 CPU_COUNT=$(command -v nproc >/dev/null 2>&1 && nproc || sysctl -n hw.ncpu)
@@ -171,13 +205,20 @@ find_lib() {
 # Copy all ggml libraries (dependencies of libllama.so)
 # With BUILD_SHARED_LIBS=ON, llama.cpp creates separate .so files for each component
 echo "Copying ggml libraries..."
-for ggml_lib in libggml.so libggml-base.so libggml-cpu.so; do
+for ggml_lib in libggml.so libggml-base.so libggml-cpu.so libggml-opencl.so; do
     GGML_PATH="$(find_lib $ggml_lib)"
     if [ -n "$GGML_PATH" ] && [ -f "$GGML_PATH" ]; then
         echo "  Found $ggml_lib at: $GGML_PATH"
         cp "$GGML_PATH" "$OUTPUT_DIR/arm64-v8a/$ggml_lib"
     fi
 done
+
+# Copy OpenCL stub library (required for GPU acceleration on Android)
+echo "Copying OpenCL library..."
+if [ -f "$OPENCL_LIBS_DIR/arm64-v8a/libOpenCL.so" ]; then
+    cp "$OPENCL_LIBS_DIR/arm64-v8a/libOpenCL.so" "$OUTPUT_DIR/arm64-v8a/libOpenCL.so"
+    echo "  Copied libOpenCL.so"
+fi
 
 # Find and copy libllama.so
 LLAMA_SO_PATH="$(find_lib libllama.so)"
