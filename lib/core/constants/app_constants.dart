@@ -38,7 +38,8 @@ class AppConstants {
   static const int topK = 50;
   static const double topP = 0.1;
   static const double repetitionPenalty = 1.05;
-  static const int contextLength = 32768; // LFM2.5 supports 32K context
+  // Context length reduced for mobile devices (32K causes OOM on <16GB RAM)
+  static const int contextLength = 2048;
   static const int numThreads = 4; // Will be adjusted based on device
 
   // Chat Template - LFM2.5 uses ChatML-like format

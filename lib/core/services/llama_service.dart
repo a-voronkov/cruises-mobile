@@ -49,6 +49,19 @@ class LlamaService {
         return false;
       }
 
+      // Validate model file size (should be at least 100MB for a valid GGUF model)
+      final modelFile = File(_modelPath!);
+      final fileSize = await modelFile.length();
+      const minValidSize = 100 * 1024 * 1024; // 100MB minimum
+
+      if (fileSize < minValidSize) {
+        debugPrint('LlamaService: Model file too small ($fileSize bytes). '
+            'Expected at least $minValidSize bytes. File may be corrupted.');
+        return false;
+      }
+
+      debugPrint('LlamaService: Model file size: ${(fileSize / 1024 / 1024).toStringAsFixed(1)} MB');
+
       onProgress?.call(0.3);
 
       // Set library path based on platform
