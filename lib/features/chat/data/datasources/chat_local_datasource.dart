@@ -43,7 +43,7 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
   @override
   Future<List<Conversation>> getConversations() async {
     final box = HiveService.conversationsBox;
-    final models = box.values.toList();
+    final models = box.values.whereType<ConversationModel>().toList();
 
     // Sort by updatedAt descending (newest first)
     models.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
@@ -116,6 +116,7 @@ class ChatLocalDataSourceImpl implements ChatLocalDataSource {
   Future<List<Message>> getMessages(String conversationId) async {
     final box = HiveService.messagesBox;
     final models = box.values
+        .whereType<MessageModel>()
         .where((m) => m.conversationId == conversationId)
         .toList();
 

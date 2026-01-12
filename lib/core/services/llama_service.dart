@@ -118,7 +118,7 @@ class LlamaService {
         stackTrace,
         callback: (event) {
           event.addMetadata('llama', {
-            'modelPath': _modelPath,
+            'modelPath': _modelPath ?? 'unknown',
             'stage': 'initialization',
           });
         },
