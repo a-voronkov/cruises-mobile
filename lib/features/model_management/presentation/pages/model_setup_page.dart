@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/services/model_download_provider.dart';
+import '../../../../core/services/llama_service_provider.dart';
+import '../../../../main.dart';
+import '../../../chat/presentation/pages/chat_page.dart';
 
 /// Model setup page - shown on first launch
 class ModelSetupPage extends ConsumerStatefulWidget {
@@ -11,37 +15,41 @@ class ModelSetupPage extends ConsumerStatefulWidget {
 }
 
 class _ModelSetupPageState extends ConsumerState<ModelSetupPage> {
-  bool _isDownloading = false;
-  double _downloadProgress = 0.0;
-  String _statusMessage = '';
+  bool _isInitializingModel = false;
 
   Future<void> _startDownload() async {
-    setState(() {
-      _isDownloading = true;
-      _statusMessage = 'Preparing download...';
-    });
+    final notifier = ref.read(modelDownloadProvider.notifier);
+    final success = await notifier.startDownload();
 
-    // TODO: Implement actual download logic
-    // Simulate download for now
-    for (int i = 0; i <= 100; i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      if (mounted) {
-        setState(() {
-          _downloadProgress = i / 100;
-          _statusMessage = 'Downloading model... $i%';
-        });
-      }
-    }
-
-    if (mounted) {
+    if (success && mounted) {
+      // Initialize the LLM after successful download
       setState(() {
-        _statusMessage = 'Download complete!';
+        _isInitializingModel = true;
       });
 
-      // Navigate to chat after a short delay
-      await Future<void>.delayed(const Duration(seconds: 1));
-      // TODO: Navigate to chat page
+      final modelNotifier = ref.read(modelInitializationProvider.notifier);
+      await modelNotifier.initialize();
+
+      if (mounted) {
+        setState(() {
+          _isInitializingModel = false;
+        });
+
+        // Invalidate model status to trigger navigation
+        ref.invalidate(modelStatusProvider);
+
+        // Navigate to chat page
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const ChatPage()),
+          );
+        }
+      }
     }
+  }
+
+  void _cancelDownload() {
+    ref.read(modelDownloadProvider.notifier).cancelDownload();
   }
 
   @override
@@ -122,44 +130,97 @@ class _ModelSetupPageState extends ConsumerState<ModelSetupPage> {
               ),
               const SizedBox(height: 32),
 
-              // Download progress
-              if (_isDownloading) ...[
-                LinearProgressIndicator(
-                  value: _downloadProgress,
-                  minHeight: 8,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _statusMessage,
-                  style: theme.textTheme.bodyMedium,
-                  textAlign: TextAlign.center,
-                ),
-              ] else ...[
-                // Download button
-                ElevatedButton(
-                  onPressed: _startDownload,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: const Text(
-                    'Download AI Model',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Make sure you have a stable internet connection',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.secondary,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+              // Download progress or button
+              _buildDownloadSection(theme),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDownloadSection(ThemeData theme) {
+    final downloadState = ref.watch(modelDownloadProvider);
+
+    if (_isInitializingModel) {
+      return Column(
+        children: [
+          const LinearProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(
+            'Initializing AI model...',
+            style: theme.textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      );
+    }
+
+    if (downloadState.isDownloading) {
+      return Column(
+        children: [
+          LinearProgressIndicator(
+            value: downloadState.progress,
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            downloadState.statusMessage,
+            style: theme.textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          TextButton(
+            onPressed: _cancelDownload,
+            child: const Text('Cancel'),
+          ),
+        ],
+      );
+    }
+
+    if (downloadState.error != null) {
+      return Column(
+        children: [
+          Icon(Icons.error_outline, color: theme.colorScheme.error, size: 48),
+          const SizedBox(height: 16),
+          Text(
+            downloadState.error!,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _startDownload,
+            child: const Text('Retry'),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      children: [
+        ElevatedButton(
+          onPressed: _startDownload,
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+          child: const Text(
+            'Download AI Model',
+            style: TextStyle(fontSize: 16),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Make sure you have a stable internet connection',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.secondary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 

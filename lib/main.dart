@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import 'core/di/injection.dart';
 import 'core/theme/app_theme.dart';
+import 'core/services/model_download_service.dart';
 import 'features/chat/presentation/pages/chat_page.dart';
 import 'features/model_management/presentation/pages/model_setup_page.dart';
 
@@ -90,9 +91,8 @@ class AppInitializer extends ConsumerWidget {
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 
 final modelStatusProvider = FutureProvider<bool>((ref) async {
-  // TODO: Implement actual model status check
-  // For now, return false to show setup page
-  await Future<void>.delayed(const Duration(seconds: 1));
-  return false;
+  // Check if model file exists and is valid
+  final downloadService = ModelDownloadService();
+  return downloadService.isModelDownloaded();
 });
 

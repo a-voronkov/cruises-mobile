@@ -11,9 +11,9 @@ class AppConstants {
   static const String modelVersion = 'GGUF';
   static const String modelFileName = 'lfm2.5-1.2b-instruct-q4_k_m.gguf';
 
-  // Model Download URL (HuggingFace or your server)
+  // Model Download URL (custom server)
   static const String modelDownloadUrl =
-      'https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/$modelFileName';
+      'https://cruises.voronkov.club/models/$modelFileName';
 
   // Model size in bytes (approximate - Q4_K_M quantization ~700MB)
   static const int modelSizeBytes = 700000000; // ~700MB
