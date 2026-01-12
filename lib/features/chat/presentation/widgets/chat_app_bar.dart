@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../main.dart';
+import '../../../settings/presentation/pages/settings_page.dart';
 
 /// Custom app bar for chat page
 class ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
@@ -43,10 +44,23 @@ class ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
                 // TODO: Show conversations list
                 break;
               case 'settings':
-                // TODO: Show settings
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsPage()),
+                );
                 break;
               case 'about':
-                // TODO: Show about dialog
+                showAboutDialog(
+                  context: context,
+                  applicationName: 'Cruises Assistant',
+                  applicationVersion: '1.0.0',
+                  applicationIcon: const Icon(Icons.sailing, size: 48),
+                  children: [
+                    const Text(
+                      'Your AI-powered travel planning companion for cruise vacations.',
+                    ),
+                  ],
+                );
                 break;
             }
           },
