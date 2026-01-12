@@ -19,18 +19,20 @@ OUTPUT_DIR="$PROJECT_ROOT/android/app/src/main/jniLibs"
 
 # Local persistent cache (useful for CI self-hosted runners)
 CACHE_ROOT="${LLAMA_CACHE_ROOT:-$HOME/.cache/cruises-mobile/llama}"
-CACHED_LIB="$CACHE_ROOT/android/$LLAMA_VERSION/arm64-v8a/libllama.so"
+CACHED_LLAMA="$CACHE_ROOT/android/$LLAMA_VERSION/arm64-v8a/libllama.so"
+CACHED_MTMD="$CACHE_ROOT/android/$LLAMA_VERSION/arm64-v8a/libmtmd.so"
 
 echo "llama.cpp version: $LLAMA_VERSION"
 echo "Project root: $PROJECT_ROOT"
 echo "Output directory: $OUTPUT_DIR"
 
-# Fast path: reuse locally cached artifact if present
-if [ -f "$CACHED_LIB" ]; then
-    echo "Using cached libllama.so: $CACHED_LIB"
+# Fast path: reuse locally cached artifacts if present
+if [ -f "$CACHED_LLAMA" ] && [ -f "$CACHED_MTMD" ]; then
+    echo "Using cached libraries from: $CACHE_ROOT/android/$LLAMA_VERSION/arm64-v8a/"
     mkdir -p "$OUTPUT_DIR/arm64-v8a"
-    cp "$CACHED_LIB" "$OUTPUT_DIR/arm64-v8a/libllama.so"
-    echo "✅ Reused cached Android llama.cpp library"
+    cp "$CACHED_LLAMA" "$OUTPUT_DIR/arm64-v8a/libllama.so"
+    cp "$CACHED_MTMD" "$OUTPUT_DIR/arm64-v8a/libmtmd.so"
+    echo "✅ Reused cached Android llama.cpp libraries (libllama.so + libmtmd.so)"
     exit 0
 fi
 
@@ -124,39 +126,62 @@ cmake .. \
     -DLLAMA_BUILD_EXAMPLES=OFF \
     -DLLAMA_BUILD_SERVER=OFF \
     -DLLAMA_BUILD_TOOLS=OFF \
-    -DLLAMA_BUILD_COMMON=OFF \
+    -DLLAMA_BUILD_COMMON=ON \
+    -DGGML_NATIVE=OFF \
     -DCMAKE_BUILD_TYPE=Release
 
 CPU_COUNT=$(command -v nproc >/dev/null 2>&1 && nproc || sysctl -n hw.ncpu)
 cmake --build . --config Release -j$CPU_COUNT
 
-# Copy library to Flutter project
-echo "Copying libllama.so to Flutter project..."
+# Copy libraries to Flutter project
+echo "Copying libraries to Flutter project..."
 mkdir -p "$OUTPUT_DIR/arm64-v8a"
 
-# llama.cpp output path varies by version/config (commonly src/ or bin/). Try known locations first.
-SO_PATH=""
-for candidate in "src/libllama.so" "bin/libllama.so" "libllama.so"; do
-    if [ -f "$candidate" ]; then
-        SO_PATH="$candidate"
-        break
-    fi
-done
+# Helper function to find a library
+find_lib() {
+    local libname="$1"
+    for candidate in "src/$libname" "bin/$libname" "$libname" "tools/mtmd/$libname" "common/$libname"; do
+        if [ -f "$candidate" ]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    # Fallback: search recursively
+    find . -maxdepth 4 -name "$libname" -print -quit 2>/dev/null || true
+}
 
-if [ -z "$SO_PATH" ]; then
-    echo "❌ Error: libllama.so not found (checked: src/, bin/, root)."
+# Find and copy libllama.so
+LLAMA_SO_PATH="$(find_lib libllama.so)"
+if [ -z "$LLAMA_SO_PATH" ]; then
+    echo "❌ Error: libllama.so not found."
     echo "Listing possible libllama.so locations (up to depth 4):"
     find . -maxdepth 4 -name libllama.so -print || true
     exit 70
 fi
+echo "Found libllama.so at: $BUILD_DIR/$LLAMA_SO_PATH"
+cp "$LLAMA_SO_PATH" "$OUTPUT_DIR/arm64-v8a/libllama.so"
 
-echo "Found libllama.so at: $BUILD_DIR/$SO_PATH"
-cp "$SO_PATH" "$OUTPUT_DIR/arm64-v8a/libllama.so"
+# Find and copy libmtmd.so (multimodal support for llama_cpp_dart 0.2.x)
+MTMD_SO_PATH="$(find_lib libmtmd.so)"
+if [ -z "$MTMD_SO_PATH" ]; then
+    echo "⚠️  Warning: libmtmd.so not found. Multimodal features may not work."
+    echo "Listing possible libmtmd.so locations (up to depth 4):"
+    find . -maxdepth 4 -name libmtmd.so -print || true
+    # Create empty placeholder to avoid runtime errors
+    touch "$OUTPUT_DIR/arm64-v8a/libmtmd.so.missing"
+else
+    echo "Found libmtmd.so at: $BUILD_DIR/$MTMD_SO_PATH"
+    cp "$MTMD_SO_PATH" "$OUTPUT_DIR/arm64-v8a/libmtmd.so"
+fi
 
 # Save to local cache for subsequent runs
-echo "Saving libllama.so to local cache..."
-mkdir -p "$(dirname "$CACHED_LIB")"
-cp "$SO_PATH" "$CACHED_LIB"
+echo "Saving libraries to local cache..."
+CACHE_DIR="$CACHE_ROOT/android/$LLAMA_VERSION/arm64-v8a"
+mkdir -p "$CACHE_DIR"
+cp "$LLAMA_SO_PATH" "$CACHE_DIR/libllama.so"
+if [ -n "$MTMD_SO_PATH" ]; then
+    cp "$MTMD_SO_PATH" "$CACHE_DIR/libmtmd.so"
+fi
 
 cd "$LLAMA_DIR"
 

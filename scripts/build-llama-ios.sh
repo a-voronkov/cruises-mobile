@@ -90,7 +90,7 @@ cmake .. \
     -DLLAMA_BUILD_EXAMPLES=OFF \
     -DLLAMA_BUILD_SERVER=OFF \
     -DLLAMA_BUILD_TOOLS=OFF \
-    -DLLAMA_BUILD_COMMON=OFF \
+    -DLLAMA_BUILD_COMMON=ON \
     -DGGML_METAL=ON \
     -DCMAKE_C_FLAGS="-fembed-bitcode" \
     -DCMAKE_CXX_FLAGS="-fembed-bitcode"
@@ -119,7 +119,7 @@ cmake .. \
     -DLLAMA_BUILD_EXAMPLES=OFF \
     -DLLAMA_BUILD_SERVER=OFF \
     -DLLAMA_BUILD_TOOLS=OFF \
-    -DLLAMA_BUILD_COMMON=OFF \
+    -DLLAMA_BUILD_COMMON=ON \
     -DGGML_METAL=ON
 
 cmake --build . --config Release -j$(sysctl -n hw.ncpu)
