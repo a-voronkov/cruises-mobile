@@ -92,17 +92,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             child: _buildMessageList(chatState),
           ),
 
-          // Input area
-          ChatInput(
-            controller: _messageController,
-            enabled: canChat,
-            onSend: (message, attachments) {
-              ref.read(chatNotifierProvider.notifier).sendMessage(message);
-              _messageController.clear();
-            },
-            onVoiceInput: () {
-              // TODO: Implement voice input
-            },
+          // Input area with SafeArea for system navigation bar
+          SafeArea(
+            top: false,
+            child: ChatInput(
+              controller: _messageController,
+              enabled: canChat,
+              onSend: (message, attachments) {
+                ref.read(chatNotifierProvider.notifier).sendMessage(message);
+                _messageController.clear();
+              },
+              onVoiceInput: () {
+                // TODO: Implement voice input
+              },
+            ),
           ),
         ],
       ),

@@ -1,7 +1,7 @@
 name: cruises_mobile
 description: An autonomous travel planning assistant with embedded LLM for mobile platforms.
 publish_to: 'none'
-version: 1.0.0+1
+version: 0.0.11+11
 
 environment:
   sdk: '>=3.7.0 <4.0.0'
@@ -20,6 +20,7 @@ dependencies:
   hive_ce: ^2.16.0
   hive_ce_flutter: ^2.3.4
   path_provider: ^2.1.5
+  package_info_plus: ^8.3.0
 
   # Network
   dio: ^5.9.0

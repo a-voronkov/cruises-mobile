@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/services/model_download_service.dart';
 import '../../../../main.dart';
 import '../providers/settings_provider.dart';
+
+/// Provider for app version info
+final packageInfoProvider = FutureProvider<PackageInfo>((ref) async {
+  return PackageInfo.fromPlatform();
+});
 
 /// Settings page
 class SettingsPage extends ConsumerWidget {
@@ -41,8 +47,8 @@ class SettingsPage extends ConsumerWidget {
 
                 // About section
                 _buildSectionHeader(context, 'About'),
-                _buildAboutTile(context),
-                _buildVersionTile(context),
+                _buildAboutTile(context, ref),
+                _buildVersionTile(context, ref),
               ],
             ),
     );
@@ -266,7 +272,13 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildAboutTile(BuildContext context) {
+  Widget _buildAboutTile(BuildContext context, WidgetRef ref) {
+    final packageInfoAsync = ref.watch(packageInfoProvider);
+    final version = packageInfoAsync.maybeWhen(
+      data: (info) => info.version,
+      orElse: () => '...',
+    );
+
     return ListTile(
       leading: const Icon(Icons.info_outline),
       title: const Text('About'),
@@ -275,7 +287,7 @@ class SettingsPage extends ConsumerWidget {
         showAboutDialog(
           context: context,
           applicationName: 'Cruises Assistant',
-          applicationVersion: '1.0.0',
+          applicationVersion: version,
           applicationIcon: const Icon(Icons.sailing, size: 48),
           children: [
             const Text(
@@ -287,11 +299,25 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildVersionTile(BuildContext context) {
-    return const ListTile(
-      leading: Icon(Icons.tag),
-      title: Text('Version'),
-      subtitle: Text('1.0.0'),
+  Widget _buildVersionTile(BuildContext context, WidgetRef ref) {
+    final packageInfoAsync = ref.watch(packageInfoProvider);
+
+    return packageInfoAsync.when(
+      loading: () => const ListTile(
+        leading: Icon(Icons.tag),
+        title: Text('Version'),
+        subtitle: Text('Loading...'),
+      ),
+      error: (_, __) => const ListTile(
+        leading: Icon(Icons.tag),
+        title: Text('Version'),
+        subtitle: Text('Unknown'),
+      ),
+      data: (info) => ListTile(
+        leading: const Icon(Icons.tag),
+        title: const Text('Version'),
+        subtitle: Text('${info.version} (build ${info.buildNumber})'),
+      ),
     );
   }
 }
