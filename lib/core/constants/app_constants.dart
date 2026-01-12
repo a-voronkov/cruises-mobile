@@ -11,9 +11,14 @@ class AppConstants {
   static const String modelVersion = 'GGUF';
   static const String modelFileName = 'lfm2.5-1.2b-instruct-q4_k_m.gguf';
 
+  // Model Server Configuration
+  static const String modelServerBaseUrl = 'https://cruises.voronkov.club/models';
+
+  // Model Manifest URL (for fetching available models list)
+  static const String modelManifestUrl = '$modelServerBaseUrl/manifest.json';
+
   // Model Download URL (custom server)
-  static const String modelDownloadUrl =
-      'https://cruises.voronkov.club/models/$modelFileName';
+  static const String modelDownloadUrl = '$modelServerBaseUrl/$modelFileName';
 
   // Model size in bytes (approximate - Q4_K_M quantization ~700MB)
   static const int modelSizeBytes = 700000000; // ~700MB

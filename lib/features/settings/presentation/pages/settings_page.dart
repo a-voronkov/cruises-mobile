@@ -31,6 +31,7 @@ class SettingsPage extends ConsumerWidget {
                 _buildSectionHeader(context, 'AI Model'),
                 _buildModelInfoTile(context),
                 _buildRedownloadModelTile(context, ref),
+                _buildDeleteModelTile(context, ref),
                 const Divider(),
 
                 // Storage section
@@ -109,10 +110,23 @@ class SettingsPage extends ConsumerWidget {
   }
 
   Widget _buildModelInfoTile(BuildContext context) {
-    return ListTile(
-      leading: const Icon(Icons.smart_toy_outlined),
-      title: const Text('Current model'),
-      subtitle: Text('${AppConstants.modelName} ${AppConstants.modelVersion}'),
+    return FutureBuilder<int?>(
+      future: ModelDownloadService().getModelSize(),
+      builder: (context, snapshot) {
+        String sizeText = '';
+        if (snapshot.hasData && snapshot.data != null) {
+          final sizeMB = (snapshot.data! / (1024 * 1024)).toStringAsFixed(0);
+          sizeText = ' • $sizeMB MB';
+        }
+        return ListTile(
+          leading: const Icon(Icons.smart_toy_outlined),
+          title: const Text('Current model'),
+          subtitle: Text('${AppConstants.modelName}$sizeText'),
+          trailing: snapshot.hasData && snapshot.data != null
+              ? Icon(Icons.check_circle, color: Colors.green[600])
+              : Icon(Icons.warning_amber, color: Colors.orange[600]),
+        );
+      },
     );
   }
 
@@ -122,6 +136,56 @@ class SettingsPage extends ConsumerWidget {
       title: const Text('Re-download model'),
       subtitle: const Text('Download the AI model again'),
       onTap: () => _showRedownloadDialog(context, ref),
+    );
+  }
+
+  Widget _buildDeleteModelTile(BuildContext context, WidgetRef ref) {
+    return ListTile(
+      leading: Icon(Icons.delete_sweep_outlined, color: Theme.of(context).colorScheme.error),
+      title: Text(
+        'Delete model',
+        style: TextStyle(color: Theme.of(context).colorScheme.error),
+      ),
+      subtitle: const Text('Remove the AI model to free up space'),
+      onTap: () => _showDeleteModelDialog(context, ref),
+    );
+  }
+
+  void _showDeleteModelDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete model?'),
+        content: const Text(
+          'This will delete the AI model (~700 MB). '
+          'You will need to download it again to use the chat feature.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () async {
+              Navigator.pop(context);
+              final service = ModelDownloadService();
+              final deleted = await service.deleteModel();
+              ref.invalidate(modelStatusProvider);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(deleted ? 'Model deleted' : 'Failed to delete model'),
+                  ),
+                );
+              }
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
   }
 
