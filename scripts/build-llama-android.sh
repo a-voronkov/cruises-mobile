@@ -14,7 +14,7 @@ if [ -z "$LLAMA_VERSION" ]; then
 fi
 
 # Build flags version - increment when cmake flags change to invalidate cache
-BUILD_FLAGS_VERSION="v4-static-ggml"
+BUILD_FLAGS_VERSION="v5-shared-libs"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -31,8 +31,8 @@ echo "Project root: $PROJECT_ROOT"
 echo "Output directory: $OUTPUT_DIR"
 
 # Fast path: reuse locally cached artifacts if present
-# With GGML_STATIC=ON, only libllama.so is essential (ggml is statically linked)
-if [ -f "$CACHE_DIR/libllama.so" ]; then
+# Check for libllama.so and libggml.so (the two essential libraries)
+if [ -f "$CACHE_DIR/libllama.so" ] && [ -f "$CACHE_DIR/libggml.so" ]; then
     echo "Using cached libraries from: $CACHE_DIR/"
     mkdir -p "$OUTPUT_DIR/arm64-v8a"
     # Copy all cached .so files
@@ -155,15 +155,13 @@ rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
-# Build with GGML_STATIC=ON to statically link ggml into libllama.so
-# This avoids the "dlopen failed: library libggml-cpu.so not found" error on Android
-# because all ggml code is embedded directly into libllama.so
+# Build shared libraries. All .so files will be copied to jniLibs
+# and pre-loaded by Android MainActivity in the correct order
 cmake .. \
     -DCMAKE_TOOLCHAIN_FILE="$NDK_PATH/build/cmake/android.toolchain.cmake" \
     -DANDROID_ABI=arm64-v8a \
     -DANDROID_PLATFORM=android-24 \
     -DBUILD_SHARED_LIBS=ON \
-    -DGGML_STATIC=ON \
     -DLLAMA_CURL=OFF \
     -DLLAMA_BUILD_TESTS=OFF \
     -DLLAMA_BUILD_EXAMPLES=OFF \
@@ -207,10 +205,16 @@ find_lib() {
     find . -maxdepth 5 -name "$libname" -print -quit 2>/dev/null || true
 }
 
-# With GGML_STATIC=ON, ggml is statically linked into libllama.so
-# No need to copy separate ggml libraries (libggml.so, libggml-cpu.so, etc.)
-# This avoids the "dlopen failed: library libggml-cpu.so not found" error on Android
-echo "Note: ggml is statically linked into libllama.so (GGML_STATIC=ON)"
+# Copy all ggml libraries (dependencies of libllama.so)
+# These need to be pre-loaded by Android MainActivity before libllama.so
+echo "Copying ggml libraries..."
+for ggml_lib in libggml.so libggml-base.so libggml-cpu.so libggml-opencl.so; do
+    GGML_PATH="$(find_lib $ggml_lib)"
+    if [ -n "$GGML_PATH" ] && [ -f "$GGML_PATH" ]; then
+        echo "  Found $ggml_lib at: $GGML_PATH"
+        cp "$GGML_PATH" "$OUTPUT_DIR/arm64-v8a/$ggml_lib"
+    fi
+done
 
 # Copy OpenCL stub library (required for GPU acceleration on Android)
 echo "Copying OpenCL library..."
