@@ -52,7 +52,7 @@ dev_dependencies:
   
   # Code Generation
   build_runner: ^2.10.4
-  hive_ce_generator: ^1.11.0
+  hive_ce_generator: ^1.10.0  # Pinned for analyzer <9.0.0 compatibility
 
 flutter:
   uses-material-design: true
