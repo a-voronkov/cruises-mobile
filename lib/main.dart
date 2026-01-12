@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 
 import 'core/di/injection.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/model_download_service.dart';
+import 'core/services/hive_service.dart';
 import 'features/chat/presentation/pages/chat_page.dart';
 import 'features/model_management/presentation/pages/model_setup_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Hive for local storage
-  await Hive.initFlutter();
+  // Initialize Hive with adapters and open boxes
+  await HiveService.initialize();
 
   // Initialize dependency injection
   await configureDependencies();

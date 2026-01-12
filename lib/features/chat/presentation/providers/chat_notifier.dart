@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/services/llama_service_provider.dart';
 import '../../../../core/utils/chat_template.dart';
 import '../../domain/entities/message.dart';
+import '../../data/datasources/chat_local_datasource_provider.dart';
 import 'cruise_context_provider.dart';
 
 /// State for the chat
@@ -42,13 +44,42 @@ class ChatState {
 class ChatNotifier extends StateNotifier<ChatState> {
   final Ref _ref;
   static const _uuid = Uuid();
+  bool _isInitialized = false;
 
   ChatNotifier(this._ref)
       : super(ChatState(conversationId: _uuid.v4())) {
-    _addWelcomeMessage();
+    _initialize();
   }
 
-  void _addWelcomeMessage() {
+  /// Initialize the chat - load existing messages or create new conversation
+  Future<void> _initialize() async {
+    if (_isInitialized) return;
+    _isInitialized = true;
+
+    final dataSource = _ref.read(chatLocalDataSourceProvider);
+
+    // Try to load existing messages for this conversation
+    final messages = await dataSource.getMessages(state.conversationId);
+
+    if (messages.isEmpty) {
+      // New conversation - add welcome message and save
+      await _createNewConversation();
+    } else {
+      state = state.copyWith(messages: messages);
+    }
+  }
+
+  /// Create a new conversation with welcome message
+  Future<void> _createNewConversation() async {
+    final dataSource = _ref.read(chatLocalDataSourceProvider);
+
+    // Create conversation in storage
+    await dataSource.createConversation(
+      id: state.conversationId,
+      title: 'Cruise Chat',
+    );
+
+    // Create and save welcome message
     final welcomeMessage = Message(
       id: _uuid.v4(),
       conversationId: state.conversationId,
@@ -65,7 +96,19 @@ How can I help you today?''',
       timestamp: DateTime.now(),
     );
 
+    await dataSource.saveMessage(welcomeMessage);
     state = state.copyWith(messages: [welcomeMessage]);
+  }
+
+  /// Load an existing conversation
+  Future<void> loadConversation(String conversationId) async {
+    final dataSource = _ref.read(chatLocalDataSourceProvider);
+    final messages = await dataSource.getMessages(conversationId);
+
+    state = ChatState(
+      conversationId: conversationId,
+      messages: messages,
+    );
   }
 
   /// Send a message and get LLM response
@@ -87,6 +130,10 @@ How can I help you today?''',
       currentResponse: '',
       error: null,
     );
+
+    // Save user message to storage
+    final dataSource = _ref.read(chatLocalDataSourceProvider);
+    await dataSource.saveMessage(userMessage);
 
     try {
       // Check if LLM is initialized
@@ -118,7 +165,8 @@ How can I help you today?''',
       }
 
       // Extract clean response
-      final finalResponse = ChatTemplate.extractResponse(responseBuffer.toString());
+      final finalResponse =
+          ChatTemplate.extractResponse(responseBuffer.toString());
 
       // Add assistant message
       final assistantMessage = Message(
@@ -129,12 +177,16 @@ How can I help you today?''',
         timestamp: DateTime.now(),
       );
 
+      // Save assistant message to storage
+      await dataSource.saveMessage(assistantMessage);
+
       state = state.copyWith(
         messages: [...state.messages, assistantMessage],
         isGenerating: false,
         currentResponse: '',
       );
     } catch (e) {
+      debugPrint('Error generating response: $e');
       state = state.copyWith(
         isGenerating: false,
         error: 'Error: $e',
@@ -143,9 +195,10 @@ How can I help you today?''',
   }
 
   /// Clear chat and start new conversation
-  void clearChat() {
+  Future<void> clearChat() async {
+    _isInitialized = false;
     state = ChatState(conversationId: _uuid.v4());
-    _addWelcomeMessage();
+    await _createNewConversation();
   }
 }
 
