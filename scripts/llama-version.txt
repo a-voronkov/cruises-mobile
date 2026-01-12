@@ -2,11 +2,11 @@
 # Update this to rebuild libraries in CI/CD
 # Format: git commit hash or tag
 
-# Using ggml-org/llama.cpp commit from 2026-01-12
-# This includes LFM2/LFM2.5 (Liquid Foundation Model 2) support
-# LFM2 support was added in commit f5e96b3 (PR #14620) on 2025-07-11
-# (see https://github.com/ggml-org/llama.cpp/pull/14620)
-537d4240d4f4dbd7f2eac1e3bf0452194fbb8e39
+# Using ggml-org/llama.cpp commit from 2025-12-28
+# This matches llama_cpp_dart 0.2.0+ submodule version
+# Includes LFM2/LFM2.5 (Liquid Foundation Model 2) support
+# (see https://github.com/ggml-org/llama.cpp/commit/4ffc47cb)
+4ffc47cb2001e7d523f9ff525335bbe34b1a2858
 
 # Alternative: use a specific tag
 # v1.0.0
