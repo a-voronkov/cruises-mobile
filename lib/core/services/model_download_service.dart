@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../constants/app_constants.dart';
 
@@ -36,7 +37,7 @@ class ModelDownloadService {
       
       return '${modelsDir.path}/${AppConstants.modelFileName}';
     } catch (e) {
-      print('Error getting model path: $e');
+      debugPrint('Error getting model path: $e');
       return null;
     }
   }
@@ -87,14 +88,14 @@ class ModelDownloadService {
 
       // Verify download
       final file = File(modelPath);
-      if (await file.exists()) {
-        final fileSize = await file.length();
+      if (file.existsSync()) {
+        final fileSize = file.lengthSync();
         if (fileSize > 100 * 1024 * 1024) {
           onProgress(1.0, 'Download complete!');
           return true;
         } else {
           onProgress(0, 'Error: Downloaded file is too small');
-          await file.delete();
+          file.deleteSync();
           return false;
         }
       }
@@ -125,15 +126,15 @@ class ModelDownloadService {
     try {
       final modelPath = await getModelPath();
       if (modelPath == null) return false;
-      
+
       final file = File(modelPath);
-      if (await file.exists()) {
-        await file.delete();
+      if (file.existsSync()) {
+        file.deleteSync();
         return true;
       }
       return false;
     } catch (e) {
-      print('Error deleting model: $e');
+      debugPrint('Error deleting model: $e');
       return false;
     }
   }
@@ -143,10 +144,10 @@ class ModelDownloadService {
     try {
       final modelPath = await getModelPath();
       if (modelPath == null) return null;
-      
+
       final file = File(modelPath);
-      if (await file.exists()) {
-        return await file.length();
+      if (file.existsSync()) {
+        return file.lengthSync();
       }
       return null;
     } catch (e) {

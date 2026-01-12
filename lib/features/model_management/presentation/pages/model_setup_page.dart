@@ -41,7 +41,7 @@ class _ModelSetupPageState extends ConsumerState<ModelSetupPage> {
         // Navigate to chat page
         if (mounted) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const ChatPage()),
+            MaterialPageRoute<void>(builder: (_) => const ChatPage()),
           );
         }
       }
