@@ -14,12 +14,12 @@ class ModelDownloadService {
   Future<bool> isModelDownloaded() async {
     final modelPath = await getModelPath();
     if (modelPath == null) return false;
-    
+
     final file = File(modelPath);
-    if (!await file.exists()) return false;
-    
+    if (!file.existsSync()) return false;
+
     // Check file size is reasonable (> 100MB for a valid model)
-    final fileSize = await file.length();
+    final fileSize = file.lengthSync();
     return fileSize > 100 * 1024 * 1024;
   }
 
@@ -30,8 +30,8 @@ class ModelDownloadService {
       final modelsDir = Directory('${directory.path}/models');
       
       // Create models directory if it doesn't exist
-      if (!await modelsDir.exists()) {
-        await modelsDir.create(recursive: true);
+      if (!modelsDir.existsSync()) {
+        modelsDir.createSync(recursive: true);
       }
       
       return '${modelsDir.path}/${AppConstants.modelFileName}';
