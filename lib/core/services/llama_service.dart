@@ -106,13 +106,19 @@ class LlamaService {
 
       onProgress?.call(0.5);
       diagnostics['initStage'] = 'pre_llama_init';
+      diagnostics['useMemorymap'] = false; // Track mmap setting for debugging
 
       // llama_cpp_dart's params are configured via mutable properties (not
       // constructor named-args). Keep this compatible with older versions.
+      //
+      // IMPORTANT: useMemorymap = false is required on some Android devices
+      // where SELinux prevents mmap of files in app_flutter directory.
+      // This loads the entire model into RAM instead of memory-mapping.
+      // Trade-off: higher RAM usage (~700MB) but more compatible.
       final modelParams = ModelParams()
         ..nGpuLayers = 0 // CPU inference for now, can enable GPU later
         ..vocabOnly = false
-        ..useMemorymap = true
+        ..useMemorymap = false // Disabled for Android SELinux compatibility
         ..useMemoryLock = false;
 
       final contextParams = ContextParams()
