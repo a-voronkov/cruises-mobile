@@ -33,7 +33,7 @@ enum ModelCapability {
 
 /// Information about a downloadable LLM model
 @freezed
-abstract class ModelInfo with _$ModelInfo {
+class ModelInfo with _$ModelInfo {
   const factory ModelInfo({
     /// Unique identifier for the model
     required String id,

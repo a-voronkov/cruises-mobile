@@ -37,6 +37,10 @@ dependencies:
   equatable: ^2.0.5
   dartz: ^0.10.1
 
+  # Serialization / Code generation annotations
+  freezed_annotation: ^3.0.0
+  json_annotation: ^4.9.0
+
   # Error Tracking
   bugsnag_flutter: ^4.2.0
 
@@ -47,12 +51,14 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  
+
   flutter_lints: ^3.0.1
-  
+
   # Code Generation
   build_runner: ^2.10.4
   hive_ce_generator: ^1.10.0  # Pinned for analyzer <9.0.0 compatibility
+  freezed: ^3.0.6
+  json_serializable: ^6.9.5
 
 flutter:
   uses-material-design: true

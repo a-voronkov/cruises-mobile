@@ -5,7 +5,7 @@ part 'cruise.g.dart';
 
 /// Port visit during a cruise
 @freezed
-abstract class PortVisit with _$PortVisit {
+class PortVisit with _$PortVisit {
   const factory PortVisit({
     required int day,
     required String portName,
@@ -23,7 +23,7 @@ abstract class PortVisit with _$PortVisit {
 
 /// Cruise data entity
 @freezed
-abstract class Cruise with _$Cruise {
+class Cruise with _$Cruise {
   const Cruise._();
 
   const factory Cruise({

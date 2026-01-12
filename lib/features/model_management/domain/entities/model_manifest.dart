@@ -7,7 +7,7 @@ part 'model_manifest.g.dart';
 
 /// Manifest containing available models for download
 @freezed
-abstract class ModelManifest with _$ModelManifest {
+class ModelManifest with _$ModelManifest {
   const ModelManifest._();
 
   const factory ModelManifest({
