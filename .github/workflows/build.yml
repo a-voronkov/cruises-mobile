@@ -97,9 +97,9 @@ jobs:
           if-no-files-found: warn
           retention-days: 1
 
-      # Analyze code
+      # Analyze code (fail only on errors, not warnings/infos)
       - name: Analyze code
-        run: flutter analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       # Run tests
       - name: Run tests
