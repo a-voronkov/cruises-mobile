@@ -4,7 +4,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.2.0 <4.0.0'
+  sdk: '>=3.6.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -51,18 +51,9 @@ dependencies:
   bugsnag_flutter: ^4.2.0
 
   # LLM Integration - llama.cpp for on-device inference
-  # NOTE: CI runner uses Flutter 3.19.0 (Dart 3.3.0). Newer llama_cpp_dart
-  # versions pull in `ffi ^2.1.4` which requires Dart >=3.7.
-  # Keep this on 0.0.9 until Flutter is upgraded.
-  llama_cpp_dart: ^0.0.9
-  ffi: ^2.1.2
-
-# Flutter 3.19.0 uses Dart 3.3.x and pins `meta` to 1.11.0, but llama_cpp_dart ->
-# typed_isolate requires meta ^1.15.0. Also note that meta 1.17.0 requires Dart
-# >=3.5.0 and will fail on this runner. `meta` is annotations-only, so overriding
-# is safe here.
-dependency_overrides:
-  meta: 1.16.0
+  # llama_cpp_dart 0.2.x uses llama.cpp 4ffc47cb (Dec 2025) with LFM2/LFM2.5 support
+  llama_cpp_dart: ^0.2.2
+  ffi: ^2.1.4
 
 dev_dependencies:
   flutter_test:

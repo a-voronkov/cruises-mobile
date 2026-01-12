@@ -49,8 +49,8 @@ Cruises Mobile is a Flutter-based mobile application that provides intelligent t
 
 | Category | Technology |
 |----------|------------|
-| **Framework** | Flutter 3.19.0 |
-| **Language** | Dart 3.2.0+ |
+| **Framework** | Flutter 3.27.2 |
+| **Language** | Dart 3.6.0+ |
 | **State Management** | Riverpod 2.x |
 | **Local Storage** | Hive |
 | **Network** | Dio |

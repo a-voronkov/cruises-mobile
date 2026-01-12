@@ -193,9 +193,8 @@ mv lfm2.5-1.2b-instruct-q4_k_m.gguf models/
 ```yaml
 # pubspec.yaml
 dependencies:
-  llama_cpp_dart: ^0.1.0  # Check for latest version
-  # OR use FFI directly
-  ffi: ^2.1.2
+  llama_cpp_dart: ^0.2.2  # LFM2/LFM2.5 supported via llama.cpp 4ffc47cb
+  ffi: ^2.1.4
 ```
 
 ### Step 3: Implement Inference
