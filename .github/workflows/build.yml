@@ -2,7 +2,9 @@ name: Build and Release
 
 # Optimized CI/CD workflow with intelligent caching
 #
-# Trigger: Automatic on every push to main + manual workflow dispatch (via GitHub Actions UI)
+# Trigger:
+#   - On push to main ONLY if commit message contains "build" (case-insensitive)
+#   - Manual workflow dispatch (always builds)
 #
 # Architecture:
 #   setup → build-android ↘
@@ -10,7 +12,7 @@ name: Build and Release
 #   setup → build-ios     ↗
 #
 # Key features:
-# - Runs on every push to main and can also be triggered manually
+# - Conditional build: only runs when commit message contains "build"
 # - Separate setup job for dependencies (cached intelligently)
 # - Parallel Android/iOS builds after setup
 # - Caches: Flutter SDK, Pub, Gradle, CocoaPods, llama.cpp, generated code
@@ -33,11 +35,42 @@ on:
 
 jobs:
   ################################################################################
+  # CHECK - Determine if build should run (commit message contains "build")
+  ################################################################################
+  check-build:
+    name: Check if build needed
+    runs-on: self-hosted
+    outputs:
+      should-build: ${{ steps.check.outputs.should-build }}
+    steps:
+      - name: Check commit message for "build" keyword
+        id: check
+        run: |
+          # Always build on workflow_dispatch
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should-build=true" >> $GITHUB_OUTPUT
+            echo "✅ Manual trigger - will build"
+            exit 0
+          fi
+
+          # Check if commit message contains "build" (case-insensitive)
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          if echo "$COMMIT_MSG" | grep -iq "build"; then
+            echo "should-build=true" >> $GITHUB_OUTPUT
+            echo "✅ Commit message contains 'build' - will build"
+          else
+            echo "should-build=false" >> $GITHUB_OUTPUT
+            echo "⏭️ Commit message does not contain 'build' - skipping build"
+          fi
+
+  ################################################################################
   # SETUP - Install and cache all dependencies and tools
   ################################################################################
   setup:
     name: Setup Dependencies & Tools
     runs-on: self-hosted
+    needs: check-build
+    if: needs.check-build.outputs.should-build == 'true'
 
     outputs:
       has-generated-code: ${{ steps.detect-generated.outputs.present }}
@@ -111,7 +144,8 @@ jobs:
   build-android:
     name: Build Android APK/AAB
     runs-on: self-hosted
-    needs: setup
+    needs: [check-build, setup]
+    if: needs.check-build.outputs.should-build == 'true'
 
     # Self-hosted runners are persistent; isolate Gradle state per Java version to avoid
     # cache contamination when the machine default JDK changes (e.g. JDK 21 → classfile 65).
@@ -448,7 +482,8 @@ jobs:
   build-ios:
     name: Build iOS APP
     runs-on: self-hosted
-    needs: setup
+    needs: [check-build, setup]
+    if: needs.check-build.outputs.should-build == 'true'
 
     # ruby/setup-ruby expects a writable toolcache directory.
 
@@ -804,8 +839,9 @@ jobs:
   ################################################################################
   create-release:
     name: Create Release
-    needs: [build-android, build-ios]
+    needs: [check-build, build-android, build-ios]
     runs-on: self-hosted
+    if: needs.check-build.outputs.should-build == 'true'
     # Create release on EVERY successful build (push to main or manual dispatch)
     permissions:
       contents: write  # Required to create releases and upload assets
