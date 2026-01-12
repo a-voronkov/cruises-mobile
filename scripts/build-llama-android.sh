@@ -12,14 +12,19 @@ if [ -z "$LLAMA_VERSION" ]; then
     echo "Error: Could not determine llama.cpp version from scripts/llama-version.txt"
     exit 1
 fi
+
+# Build flags version - increment when cmake flags change to invalidate cache
+BUILD_FLAGS_VERSION="v2-no-openmp"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 LLAMA_DIR="$PROJECT_ROOT/build/llama.cpp"
 OUTPUT_DIR="$PROJECT_ROOT/android/app/src/main/jniLibs"
 
 # Local persistent cache (useful for CI self-hosted runners)
+# Cache key includes llama version AND build flags version
 CACHE_ROOT="${LLAMA_CACHE_ROOT:-$HOME/.cache/cruises-mobile/llama}"
-CACHE_DIR="$CACHE_ROOT/android/$LLAMA_VERSION/arm64-v8a"
+CACHE_DIR="$CACHE_ROOT/android/$LLAMA_VERSION-$BUILD_FLAGS_VERSION/arm64-v8a"
 
 echo "llama.cpp version: $LLAMA_VERSION"
 echo "Project root: $PROJECT_ROOT"
@@ -133,6 +138,7 @@ cmake .. \
     -DLLAMA_BUILD_TOOLS=OFF \
     -DLLAMA_BUILD_COMMON=ON \
     -DGGML_NATIVE=OFF \
+    -DGGML_OPENMP=OFF \
     -DCMAKE_BUILD_TYPE=Release
 
 CPU_COUNT=$(command -v nproc >/dev/null 2>&1 && nproc || sysctl -n hw.ncpu)
@@ -206,7 +212,7 @@ fi
 
 # Save to local cache for subsequent runs
 echo "Saving libraries to local cache..."
-CACHE_DIR="$CACHE_ROOT/android/$LLAMA_VERSION/arm64-v8a"
+CACHE_DIR="$CACHE_ROOT/android/$LLAMA_VERSION-$BUILD_FLAGS_VERSION/arm64-v8a"
 mkdir -p "$CACHE_DIR"
 # Copy all .so files from output to cache
 for so_file in "$OUTPUT_DIR/arm64-v8a"/*.so; do
