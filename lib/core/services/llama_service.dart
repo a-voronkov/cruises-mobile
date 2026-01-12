@@ -32,6 +32,9 @@ class LlamaService {
     String? modelFileName,
     void Function(double progress)? onProgress,
   }) async {
+    // Diagnostic info collected during initialization
+    Map<String, dynamic> diagnostics = {};
+
     try {
       if (_isInitialized) {
         debugPrint('LlamaService: Already initialized');
@@ -44,17 +47,46 @@ class LlamaService {
       final fileName = modelFileName ?? AppConstants.modelFileName;
       _modelPath = await _getModelPath(fileName);
 
-      if (_modelPath == null || !File(_modelPath!).existsSync()) {
+      // Collect diagnostic information
+      diagnostics['expectedModelFileName'] = fileName;
+      diagnostics['resolvedModelPath'] = _modelPath ?? 'null';
+      diagnostics['appDocumentsDir'] = (await getApplicationDocumentsDirectory()).path;
+      diagnostics['platform'] = Platform.operatingSystem;
+      diagnostics['platformVersion'] = Platform.operatingSystemVersion;
+
+      if (_modelPath == null) {
+        diagnostics['modelExists'] = false;
+        diagnostics['error'] = 'Model path is null';
+        await _reportDiagnostics('Model path resolution failed', diagnostics);
+        return false;
+      }
+
+      final modelFile = File(_modelPath!);
+      final modelExists = modelFile.existsSync();
+      diagnostics['modelExists'] = modelExists;
+
+      if (!modelExists) {
+        diagnostics['error'] = 'Model file not found';
+        await _reportDiagnostics('Model file not found', diagnostics);
         debugPrint('LlamaService: Model file not found at $_modelPath');
         return false;
       }
 
       // Validate model file size (should be at least 100MB for a valid GGUF model)
-      final modelFile = File(_modelPath!);
       final fileSize = await modelFile.length();
+      final fileStat = await modelFile.stat();
       const minValidSize = 100 * 1024 * 1024; // 100MB minimum
 
+      diagnostics['fileSizeBytes'] = fileSize;
+      diagnostics['fileSizeMB'] = (fileSize / 1024 / 1024).toStringAsFixed(2);
+      diagnostics['expectedSizeBytes'] = AppConstants.modelSizeBytes;
+      diagnostics['expectedSizeMB'] = (AppConstants.modelSizeBytes / 1024 / 1024).toStringAsFixed(2);
+      diagnostics['fileModified'] = fileStat.modified.toIso8601String();
+      diagnostics['fileMode'] = fileStat.mode.toString();
+
       if (fileSize < minValidSize) {
+        diagnostics['error'] = 'Model file too small (possibly corrupted or incomplete download)';
+        await _reportDiagnostics('Model file validation failed', diagnostics);
         debugPrint('LlamaService: Model file too small ($fileSize bytes). '
             'Expected at least $minValidSize bytes. File may be corrupted.');
         return false;
@@ -66,11 +98,14 @@ class LlamaService {
 
       // Set library path based on platform
       final libraryPath = await _getLibraryPath();
+      diagnostics['libraryPath'] = libraryPath ?? 'default (embedded)';
+
       if (libraryPath != null) {
         Llama.libraryPath = libraryPath;
       }
 
       onProgress?.call(0.5);
+      diagnostics['initStage'] = 'pre_llama_init';
 
       // llama_cpp_dart's params are configured via mutable properties (not
       // constructor named-args). Keep this compatible with older versions.
@@ -127,14 +162,22 @@ class LlamaService {
       debugPrint('LlamaService: Initialization failed: $e');
       debugPrint('Stack trace: $stackTrace');
 
-      // Report to Bugsnag for crash analytics
+      // Add error info to diagnostics
+      diagnostics['error'] = e.toString();
+      diagnostics['stage'] = 'llama_init';
+
+      // Report to Bugsnag with full diagnostics
       await bugsnag.notify(
         e,
         stackTrace,
         callback: (event) {
-          event.addMetadata('llama', {
-            'modelPath': _modelPath ?? 'unknown',
-            'stage': 'initialization',
+          event.addMetadata('llama', diagnostics);
+          event.addMetadata('app_config', {
+            'modelFileName': AppConstants.modelFileName,
+            'modelServerBaseUrl': AppConstants.modelServerBaseUrl,
+            'contextLength': AppConstants.contextLength,
+            'numThreads': AppConstants.numThreads,
+            'temperature': AppConstants.temperature,
           });
           return true;
         },
@@ -143,6 +186,24 @@ class LlamaService {
       _isInitialized = false;
       return false;
     }
+  }
+
+  /// Report diagnostics to Bugsnag for debugging
+  Future<void> _reportDiagnostics(String message, Map<String, dynamic> diagnostics) async {
+    await bugsnag.notify(
+      Exception(message),
+      StackTrace.current,
+      callback: (event) {
+        event.addMetadata('llama', diagnostics);
+        event.addMetadata('app_config', {
+          'modelFileName': AppConstants.modelFileName,
+          'modelServerBaseUrl': AppConstants.modelServerBaseUrl,
+          'contextLength': AppConstants.contextLength,
+          'numThreads': AppConstants.numThreads,
+        });
+        return true;
+      },
+    );
   }
 
   /// Generate text from a prompt with streaming support
