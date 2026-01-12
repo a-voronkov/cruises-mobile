@@ -99,25 +99,25 @@ class CruiseContext {
 
 /// Mock cruise data for development
 CruiseContext getMockCruiseContext() {
-  return CruiseContext(
+  return const CruiseContext(
     cruiseCompany: 'Royal Caribbean',
     shipName: 'Spectrum of the Seas',
     itinerary: '3 Days Shanghai round-trip',
     schedule: [
-      const CruiseScheduleDay(
+      CruiseScheduleDay(
         day: 1,
         port: 'Shanghai',
         portType: 'terminal',
         boardingTime: '18:00',
       ),
-      const CruiseScheduleDay(
+      CruiseScheduleDay(
         day: 2,
         port: 'Jeju',
         portType: 'tender',
         arrivalTime: '10:00',
         boardingTime: '18:00',
       ),
-      const CruiseScheduleDay(
+      CruiseScheduleDay(
         day: 3,
         port: 'Shanghai',
         portType: 'terminal',

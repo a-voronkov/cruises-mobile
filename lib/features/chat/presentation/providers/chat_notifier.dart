@@ -3,7 +3,6 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/services/llama_service_provider.dart';
 import '../../../../core/utils/chat_template.dart';
 import '../../domain/entities/message.dart';
-import '../../data/datasources/llm_inference_datasource_provider.dart';
 import 'cruise_context_provider.dart';
 
 /// State for the chat
@@ -15,11 +14,11 @@ class ChatState {
   final String conversationId;
 
   const ChatState({
+    required this.conversationId,
     this.messages = const [],
     this.isGenerating = false,
     this.currentResponse = '',
     this.error,
-    required this.conversationId,
   });
 
   ChatState copyWith({

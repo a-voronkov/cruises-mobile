@@ -19,8 +19,10 @@ class MessageBubble extends StatelessWidget {
     this.timestamp,
     this.isStreaming = false,
     super.key,
-  }) : assert(message != null || (content != null && isUser != null),
-            'Either message or content+isUser must be provided');
+  }) : assert(
+            message != null || (content != null && isUser != null),
+            'Either message or content+isUser must be provided',
+          );
 
   @override
   Widget build(BuildContext context) {
