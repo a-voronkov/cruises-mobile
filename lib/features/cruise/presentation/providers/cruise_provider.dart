@@ -29,10 +29,28 @@ class CruiseSearchParams {
   });
 }
 
+/// Notifier for cruise search parameters (replaces StateProvider in Riverpod 3.x)
+class CruiseSearchParamsNotifier extends Notifier<CruiseSearchParams> {
+  @override
+  CruiseSearchParams build() => const CruiseSearchParams();
+
+  void update({int? departurePortId, DateTime? startDate, DateTime? endDate}) {
+    state = CruiseSearchParams(
+      departurePortId: departurePortId ?? state.departurePortId,
+      startDate: startDate ?? state.startDate,
+      endDate: endDate ?? state.endDate,
+    );
+  }
+
+  void reset() {
+    state = const CruiseSearchParams();
+  }
+}
+
 /// Provider for cruise search parameters
-final cruiseSearchParamsProvider = StateProvider<CruiseSearchParams>((ref) {
-  return const CruiseSearchParams();
-});
+final cruiseSearchParamsProvider =
+    NotifierProvider<CruiseSearchParamsNotifier, CruiseSearchParams>(
+        CruiseSearchParamsNotifier.new);
 
 /// Provider for cruise search results
 final cruiseSearchResultsProvider =
@@ -53,23 +71,38 @@ final savedCruisesProvider = Provider<List<Cruise>>((ref) {
   return box.values.map((m) => m.toEntity()).toList();
 });
 
-/// Provider for the currently selected/active cruise
-final activeCruiseProvider = StateProvider<Cruise?>((ref) {
-  // Try to get from saved cruises
-  final saved = ref.watch(savedCruisesProvider);
-  if (saved.isNotEmpty) {
-    // Return the most recent cruise by start date
-    final sorted = [...saved]..sort((a, b) => b.startDate.compareTo(a.startDate));
-    return sorted.first;
+/// Notifier for the currently selected/active cruise
+class ActiveCruiseNotifier extends Notifier<Cruise?> {
+  @override
+  Cruise? build() {
+    // Try to get from saved cruises
+    final saved = ref.watch(savedCruisesProvider);
+    if (saved.isNotEmpty) {
+      // Return the most recent cruise by start date
+      final sorted = [...saved]
+        ..sort((a, b) => b.startDate.compareTo(a.startDate));
+      return sorted.first;
+    }
+    return null;
   }
-  return null;
-});
+
+  void setActiveCruise(Cruise cruise) {
+    state = cruise;
+  }
+
+  void clear() {
+    state = null;
+  }
+}
+
+/// Provider for the currently selected/active cruise
+final activeCruiseProvider =
+    NotifierProvider<ActiveCruiseNotifier, Cruise?>(ActiveCruiseNotifier.new);
 
 /// Notifier for managing cruise operations
-class CruiseNotifier extends StateNotifier<AsyncValue<void>> {
-  final Ref _ref;
-
-  CruiseNotifier(this._ref) : super(const AsyncValue.data(null));
+class CruiseNotifier extends Notifier<AsyncValue<void>> {
+  @override
+  AsyncValue<void> build() => const AsyncValue.data(null);
 
   /// Save a cruise to local storage
   Future<void> saveCruise(Cruise cruise) async {
@@ -78,7 +111,7 @@ class CruiseNotifier extends StateNotifier<AsyncValue<void>> {
       final box = HiveService.cruisesBox;
       final model = CruiseModel.fromEntity(cruise);
       await box.put(cruise.id, model);
-      _ref.invalidateSelf();
+      ref.invalidateSelf();
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -91,7 +124,7 @@ class CruiseNotifier extends StateNotifier<AsyncValue<void>> {
     try {
       final box = HiveService.cruisesBox;
       await box.delete(cruiseId);
-      _ref.invalidateSelf();
+      ref.invalidateSelf();
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -100,13 +133,11 @@ class CruiseNotifier extends StateNotifier<AsyncValue<void>> {
 
   /// Set the active cruise
   void setActiveCruise(Cruise cruise) {
-    _ref.read(activeCruiseProvider.notifier).state = cruise;
+    ref.read(activeCruiseProvider.notifier).setActiveCruise(cruise);
   }
 }
 
 /// Provider for cruise operations
 final cruiseNotifierProvider =
-    StateNotifierProvider<CruiseNotifier, AsyncValue<void>>((ref) {
-  return CruiseNotifier(ref);
-});
+    NotifierProvider<CruiseNotifier, AsyncValue<void>>(CruiseNotifier.new);
 

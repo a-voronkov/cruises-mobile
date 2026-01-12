@@ -14,9 +14,19 @@ final modelManifestProvider = FutureProvider<ModelManifest>((ref) async {
   return service.getManifest();
 });
 
+/// Notifier for the currently selected model ID
+class SelectedModelIdNotifier extends Notifier<String?> {
+  @override
+  String? build() => null; // Will be set based on manifest or user preference
+
+  void select(String? modelId) {
+    state = modelId;
+  }
+}
+
 /// Provider for the currently selected model ID
 /// Defaults to the recommended model from the manifest
-final selectedModelIdProvider = StateProvider<String?>((ref) {
-  return null; // Will be set based on manifest or user preference
-});
+final selectedModelIdProvider =
+    NotifierProvider<SelectedModelIdNotifier, String?>(
+        SelectedModelIdNotifier.new);
 

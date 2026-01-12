@@ -189,11 +189,11 @@ class _CruiseSelectionPageState extends ConsumerState<CruiseSelectionPage> {
       setState(() => _currentStep = 1);
     } else if (_currentStep == 1) {
       // Update search params and move to cruise selection
-      ref.read(cruiseSearchParamsProvider.notifier).state = CruiseSearchParams(
-        departurePortId: _selectedPort?.id,
-        startDate: _startDate,
-        endDate: _endDate,
-      );
+      ref.read(cruiseSearchParamsProvider.notifier).update(
+            departurePortId: _selectedPort?.id,
+            startDate: _startDate,
+            endDate: _endDate,
+          );
       setState(() => _currentStep = 2);
     } else if (_currentStep == 2 && _selectedCruise != null) {
       _confirmSelection();
