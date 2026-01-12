@@ -53,7 +53,7 @@ dependencies:
   # LLM Integration - llama.cpp for on-device inference
   # llama_cpp_dart 0.2.x uses llama.cpp 4ffc47cb (Dec 2025) with LFM2/LFM2.5 support
   llama_cpp_dart: ^0.2.2
-  ffi: ^2.1.4
+  ffi: ^2.1.0  # Compatible with Dart 3.6.x (Flutter 3.27.2)
 
 dev_dependencies:
   flutter_test:
