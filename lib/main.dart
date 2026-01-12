@@ -1,3 +1,4 @@
+import 'package:bugsnag_flutter/bugsnag_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,18 +10,24 @@ import 'features/chat/presentation/pages/chat_page.dart';
 import 'features/model_management/presentation/pages/model_setup_page.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // Initialize Bugsnag for error tracking
+  await bugsnag.start(
+    apiKey: 'ff5741e8bfedbe083742cad85830d768',
+    runApp: () async {
+      WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Hive with adapters and open boxes
-  await HiveService.initialize();
+      // Initialize Hive with adapters and open boxes
+      await HiveService.initialize();
 
-  // Initialize dependency injection
-  await configureDependencies();
+      // Initialize dependency injection
+      await configureDependencies();
 
-  runApp(
-    const ProviderScope(
-      child: CruisesApp(),
-    ),
+      runApp(
+        const ProviderScope(
+          child: CruisesApp(),
+        ),
+      );
+    },
   );
 }
 

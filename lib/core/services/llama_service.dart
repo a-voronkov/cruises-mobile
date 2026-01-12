@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:bugsnag_flutter/bugsnag_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:llama_cpp_dart/llama_cpp_dart.dart';
 import 'package:path_provider/path_provider.dart';
@@ -110,6 +111,19 @@ class LlamaService {
     } catch (e, stackTrace) {
       debugPrint('LlamaService: Initialization failed: $e');
       debugPrint('Stack trace: $stackTrace');
+
+      // Report to Bugsnag for crash analytics
+      await bugsnag.notify(
+        e,
+        stackTrace,
+        callback: (event) {
+          event.addMetadata('llama', {
+            'modelPath': _modelPath,
+            'stage': 'initialization',
+          });
+        },
+      );
+
       _isInitialized = false;
       return false;
     }

@@ -1,3 +1,4 @@
+import 'package:bugsnag_flutter/bugsnag_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'llama_service.dart';
 
@@ -81,13 +82,34 @@ class ModelInitializationNotifier extends StateNotifier<ModelInitializationState
           error: 'Failed to initialize model. Please check if the model file exists.',
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // Report to Bugsnag with full context
+      await bugsnag.notify(
+        e,
+        stackTrace,
+        callback: (event) {
+          event.addMetadata('model_initialization', {
+            'progress': state.progress,
+            'stage': _getStageFromProgress(state.progress),
+          });
+        },
+      );
+
       state = state.copyWith(
         isInitialized: false,
         isLoading: false,
         error: 'Error initializing model: $e',
       );
     }
+  }
+
+  String _getStageFromProgress(double progress) {
+    if (progress < 0.3) return 'locating_model';
+    if (progress < 0.5) return 'setting_library_path';
+    if (progress < 0.7) return 'creating_load_command';
+    if (progress < 1.0) return 'initializing_llama_parent';
+    return 'completed';
+  }
   }
 
   /// Reset initialization state
