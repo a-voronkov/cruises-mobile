@@ -1,4 +1,4 @@
-/// Application-wide constants
+/// Application-wide constants and configuration
 class AppConstants {
   AppConstants._();
 
