@@ -1,0 +1,62 @@
+# Build configuration for code generators
+# This file configures how build_runner processes files
+
+targets:
+  $default:
+    builders:
+      # Configure Hive CE generator to only process files in data/models directories
+      # and skip domain entities (which use @freezed)
+      hive_ce_generator|hive_type_adapter_generator:
+        generate_for:
+          include:
+            - lib/features/**/data/models/*.dart
+            - lib/features/chat/data/models/*.dart
+            - lib/features/cruise/data/models/*.dart
+          exclude:
+            - lib/features/**/domain/**
+            - lib/features/**/entities/**
+            - "**/*.freezed.dart"
+            - "**/*.g.dart"
+      
+      hive_ce_generator|hive_adapters_generator:
+        generate_for:
+          include:
+            - lib/features/**/data/models/*.dart
+          exclude:
+            - lib/features/**/domain/**
+            - lib/features/**/entities/**
+            - "**/*.freezed.dart"
+            - "**/*.g.dart"
+
+      hive_ce_generator|hive_registrar_intermediate_generator:
+        generate_for:
+          include:
+            - lib/features/**/data/models/*.dart
+          exclude:
+            - lib/features/**/domain/**
+            - lib/features/**/entities/**
+            - "**/*.freezed.dart"
+            - "**/*.g.dart"
+
+      # Freezed generator only for domain entities
+      freezed|freezed:
+        generate_for:
+          include:
+            - lib/features/**/domain/entities/*.dart
+            - lib/core/error/*.dart
+          exclude:
+            - lib/features/**/data/models/*.dart
+            - "**/*.freezed.dart"
+            - "**/*.g.dart"
+
+      # JSON serializable for freezed classes
+      json_serializable|json_serializable:
+        generate_for:
+          include:
+            - lib/features/**/domain/entities/*.dart
+            - lib/core/error/*.dart
+          exclude:
+            - lib/features/**/data/models/*.dart
+            - "**/*.freezed.dart"
+            - "**/*.g.dart"
+
