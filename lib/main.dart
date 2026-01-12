@@ -1,6 +1,7 @@
 import 'package:bugsnag_flutter/bugsnag_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import 'core/di/injection.dart';
 import 'core/theme/app_theme.dart';

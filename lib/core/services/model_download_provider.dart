@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'model_download_service.dart';
 
 /// Provider for ModelDownloadService singleton
