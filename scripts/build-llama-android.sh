@@ -19,20 +19,25 @@ OUTPUT_DIR="$PROJECT_ROOT/android/app/src/main/jniLibs"
 
 # Local persistent cache (useful for CI self-hosted runners)
 CACHE_ROOT="${LLAMA_CACHE_ROOT:-$HOME/.cache/cruises-mobile/llama}"
-CACHED_LLAMA="$CACHE_ROOT/android/$LLAMA_VERSION/arm64-v8a/libllama.so"
-CACHED_MTMD="$CACHE_ROOT/android/$LLAMA_VERSION/arm64-v8a/libmtmd.so"
+CACHE_DIR="$CACHE_ROOT/android/$LLAMA_VERSION/arm64-v8a"
 
 echo "llama.cpp version: $LLAMA_VERSION"
 echo "Project root: $PROJECT_ROOT"
 echo "Output directory: $OUTPUT_DIR"
 
 # Fast path: reuse locally cached artifacts if present
-if [ -f "$CACHED_LLAMA" ] && [ -f "$CACHED_MTMD" ]; then
-    echo "Using cached libraries from: $CACHE_ROOT/android/$LLAMA_VERSION/arm64-v8a/"
+# Check for libllama.so and libggml.so (the two essential libraries)
+if [ -f "$CACHE_DIR/libllama.so" ] && [ -f "$CACHE_DIR/libggml.so" ]; then
+    echo "Using cached libraries from: $CACHE_DIR/"
     mkdir -p "$OUTPUT_DIR/arm64-v8a"
-    cp "$CACHED_LLAMA" "$OUTPUT_DIR/arm64-v8a/libllama.so"
-    cp "$CACHED_MTMD" "$OUTPUT_DIR/arm64-v8a/libmtmd.so"
-    echo "✅ Reused cached Android llama.cpp libraries (libllama.so + libmtmd.so)"
+    # Copy all cached .so files
+    for cached_so in "$CACHE_DIR"/*.so; do
+        if [ -f "$cached_so" ]; then
+            cp "$cached_so" "$OUTPUT_DIR/arm64-v8a/"
+        fi
+    done
+    echo "✅ Reused cached Android llama.cpp libraries:"
+    ls -lh "$OUTPUT_DIR/arm64-v8a/"*.so 2>/dev/null || true
     exit 0
 fi
 
@@ -133,29 +138,47 @@ cmake .. \
 CPU_COUNT=$(command -v nproc >/dev/null 2>&1 && nproc || sysctl -n hw.ncpu)
 cmake --build . --config Release -j$CPU_COUNT
 
+# List all generated .so files for debugging
+echo ""
+echo "All generated .so files:"
+find . -name "*.so" -type f 2>/dev/null | head -50
+
 # Copy libraries to Flutter project
+echo ""
 echo "Copying libraries to Flutter project..."
 mkdir -p "$OUTPUT_DIR/arm64-v8a"
 
 # Helper function to find a library
 find_lib() {
     local libname="$1"
-    for candidate in "src/$libname" "bin/$libname" "$libname" "tools/mtmd/$libname" "common/$libname"; do
+    for candidate in "bin/$libname" "src/$libname" "$libname" "tools/mtmd/$libname" "common/$libname" \
+                     "ggml/src/$libname" "ggml/src/ggml/$libname"; do
         if [ -f "$candidate" ]; then
             echo "$candidate"
             return 0
         fi
     done
     # Fallback: search recursively
-    find . -maxdepth 4 -name "$libname" -print -quit 2>/dev/null || true
+    find . -maxdepth 5 -name "$libname" -print -quit 2>/dev/null || true
 }
+
+# Copy all ggml libraries (dependencies of libllama.so)
+# With BUILD_SHARED_LIBS=ON, llama.cpp creates separate .so files for each component
+echo "Copying ggml libraries..."
+for ggml_lib in libggml.so libggml-base.so libggml-cpu.so; do
+    GGML_PATH="$(find_lib $ggml_lib)"
+    if [ -n "$GGML_PATH" ] && [ -f "$GGML_PATH" ]; then
+        echo "  Found $ggml_lib at: $GGML_PATH"
+        cp "$GGML_PATH" "$OUTPUT_DIR/arm64-v8a/$ggml_lib"
+    fi
+done
 
 # Find and copy libllama.so
 LLAMA_SO_PATH="$(find_lib libllama.so)"
 if [ -z "$LLAMA_SO_PATH" ]; then
     echo "❌ Error: libllama.so not found."
-    echo "Listing possible libllama.so locations (up to depth 4):"
-    find . -maxdepth 4 -name libllama.so -print || true
+    echo "Listing possible libllama.so locations (up to depth 5):"
+    find . -maxdepth 5 -name libllama.so -print || true
     exit 70
 fi
 echo "Found libllama.so at: $BUILD_DIR/$LLAMA_SO_PATH"
@@ -165,8 +188,8 @@ cp "$LLAMA_SO_PATH" "$OUTPUT_DIR/arm64-v8a/libllama.so"
 MTMD_SO_PATH="$(find_lib libmtmd.so)"
 if [ -z "$MTMD_SO_PATH" ]; then
     echo "⚠️  Warning: libmtmd.so not found. Multimodal features may not work."
-    echo "Listing possible libmtmd.so locations (up to depth 4):"
-    find . -maxdepth 4 -name libmtmd.so -print || true
+    echo "Listing possible libmtmd.so locations (up to depth 5):"
+    find . -maxdepth 5 -name libmtmd.so -print || true
     # Create empty placeholder to avoid runtime errors
     touch "$OUTPUT_DIR/arm64-v8a/libmtmd.so.missing"
 else
@@ -174,14 +197,23 @@ else
     cp "$MTMD_SO_PATH" "$OUTPUT_DIR/arm64-v8a/libmtmd.so"
 fi
 
+# Find and copy libcommon.so if exists
+COMMON_SO_PATH="$(find_lib libcommon.so)"
+if [ -n "$COMMON_SO_PATH" ] && [ -f "$COMMON_SO_PATH" ]; then
+    echo "Found libcommon.so at: $BUILD_DIR/$COMMON_SO_PATH"
+    cp "$COMMON_SO_PATH" "$OUTPUT_DIR/arm64-v8a/libcommon.so"
+fi
+
 # Save to local cache for subsequent runs
 echo "Saving libraries to local cache..."
 CACHE_DIR="$CACHE_ROOT/android/$LLAMA_VERSION/arm64-v8a"
 mkdir -p "$CACHE_DIR"
-cp "$LLAMA_SO_PATH" "$CACHE_DIR/libllama.so"
-if [ -n "$MTMD_SO_PATH" ]; then
-    cp "$MTMD_SO_PATH" "$CACHE_DIR/libmtmd.so"
-fi
+# Copy all .so files from output to cache
+for so_file in "$OUTPUT_DIR/arm64-v8a"/*.so; do
+    if [ -f "$so_file" ]; then
+        cp "$so_file" "$CACHE_DIR/"
+    fi
+done
 
 cd "$LLAMA_DIR"
 

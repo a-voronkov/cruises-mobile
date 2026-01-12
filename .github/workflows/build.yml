@@ -376,15 +376,24 @@ jobs:
         # On self-hosted runners it's usually configured as a machine-level env var,
         # and setting it via `${{ env.ANDROID_NDK_HOME }}` can unintentionally blank it.
 
-      # Verify llama.cpp library exists
-      - name: Verify llama.cpp library
+      # Verify llama.cpp libraries exist (libllama.so + libggml.so required)
+      - name: Verify llama.cpp libraries
         run: |
-          if [ ! -f "android/app/src/main/jniLibs/arm64-v8a/libllama.so" ]; then
+          JNILIBS_DIR="android/app/src/main/jniLibs/arm64-v8a"
+
+          if [ ! -f "$JNILIBS_DIR/libllama.so" ]; then
             echo "❌ Error: libllama.so not found!"
             exit 1
           fi
-          echo "✅ llama.cpp library found"
-          ls -lh android/app/src/main/jniLibs/*/libllama.so
+
+          if [ ! -f "$JNILIBS_DIR/libggml.so" ]; then
+            echo "❌ Error: libggml.so not found!"
+            echo "This library is required by libllama.so at runtime."
+            exit 1
+          fi
+
+          echo "✅ llama.cpp libraries found:"
+          ls -lh "$JNILIBS_DIR"/*.so
 
       # Get dependencies (should be fast due to cache)
       - name: Get dependencies
