@@ -5,8 +5,8 @@ import 'package:flutter_riverpod/legacy.dart';
 
 import 'core/di/injection.dart';
 import 'core/theme/app_theme.dart';
-import 'core/services/model_download_service.dart';
 import 'core/services/hive_service.dart';
+import 'core/providers/model_status_provider.dart';
 import 'features/chat/presentation/pages/chat_page.dart';
 import 'features/model_management/presentation/pages/model_setup_page.dart';
 
@@ -94,10 +94,4 @@ class AppInitializer extends ConsumerWidget {
 
 // Placeholder providers - will be implemented in respective features
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
-
-final modelStatusProvider = FutureProvider<bool>((ref) async {
-  // Check if model file exists and is valid
-  final downloadService = ModelDownloadService();
-  return downloadService.isModelDownloaded();
-});
 

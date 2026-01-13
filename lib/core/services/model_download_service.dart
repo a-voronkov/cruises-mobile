@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../constants/app_constants.dart';
 import '../models/model_info.dart';
+import 'hive_service.dart';
 
 /// Service for downloading and managing the LLM model file
 class ModelDownloadService {
@@ -13,15 +14,56 @@ class ModelDownloadService {
   /// Currently selected model filename (null = default from AppConstants)
   String? _selectedModelFileName;
 
-  ModelDownloadService({Dio? dio}) : _dio = dio ?? Dio();
+  /// Currently selected model info (persisted in Hive settings box)
+  ModelInfo? _selectedModel;
+
+  ModelDownloadService({Dio? dio}) : _dio = dio ?? Dio() {
+    _loadSelectedModelFromStorage();
+  }
+
+  void _loadSelectedModelFromStorage() {
+    try {
+      final raw = HiveService.settingsBox.get(AppConstants.modelStorageKey);
+      if (raw is Map) {
+        final map = Map<String, dynamic>.from(raw as Map);
+        _selectedModel = ModelInfo.fromJson(map);
+        _selectedModelFileName = _selectedModel?.fileName;
+      }
+    } catch (e) {
+      // Hive may not be initialized yet or stored data may be incompatible.
+      // Fall back to default model.
+      debugPrint('ModelDownloadService: failed to load selected model: $e');
+    }
+  }
 
   /// Get the current model filename
   String get currentModelFileName =>
       _selectedModelFileName ?? AppConstants.modelFileName;
 
+  /// Get the currently selected model (if stored)
+  ModelInfo? get selectedModel => _selectedModel;
+
   /// Set the selected model
-  void selectModel(ModelInfo model) {
+  Future<void> selectModel(ModelInfo model) async {
+    _selectedModel = model;
     _selectedModelFileName = model.fileName;
+
+    try {
+      await HiveService.settingsBox.put(AppConstants.modelStorageKey, model.toJson());
+    } catch (e) {
+      debugPrint('ModelDownloadService: failed to persist selected model: $e');
+    }
+  }
+
+  /// Clear persisted model selection (falls back to default model)
+  Future<void> clearSelectedModel() async {
+    _selectedModel = null;
+    _selectedModelFileName = null;
+    try {
+      await HiveService.settingsBox.delete(AppConstants.modelStorageKey);
+    } catch (e) {
+      debugPrint('ModelDownloadService: failed to clear selected model: $e');
+    }
   }
 
   /// Fetch available models from server manifest
@@ -172,7 +214,7 @@ class ModelDownloadService {
         if (fileSize > 100 * 1024 * 1024) {
           // Update selected model on successful download
           if (modelInfo != null) {
-            _selectedModelFileName = modelInfo.fileName;
+            await selectModel(modelInfo);
           }
           onProgress(1.0, 'Download complete!');
           return true;
@@ -218,6 +260,12 @@ class ModelDownloadService {
       final file = File(modelPath);
       if (file.existsSync()) {
         file.deleteSync();
+
+        // If we deleted the selected model, clear selection to avoid pointing
+        // at a missing file.
+        if (fileName == _selectedModelFileName) {
+          await clearSelectedModel();
+        }
         return true;
       }
       return false;

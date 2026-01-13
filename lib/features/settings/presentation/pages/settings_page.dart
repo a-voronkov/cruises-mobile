@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/model_status_provider.dart';
 import '../../../../core/services/model_download_service.dart';
 import '../../../../main.dart';
 import '../providers/settings_provider.dart';

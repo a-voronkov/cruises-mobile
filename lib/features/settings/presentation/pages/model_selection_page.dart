@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/model_info.dart';
-import '../../../../main.dart';
+import '../../../../core/providers/model_status_provider.dart';
 import '../providers/model_manifest_provider.dart';
 
 /// Page for selecting and downloading AI models
@@ -90,9 +90,9 @@ class ModelSelectionPage extends ConsumerWidget {
     }
   }
 
-  void _selectModel(BuildContext context, WidgetRef ref, ModelInfo model) {
+  Future<void> _selectModel(BuildContext context, WidgetRef ref, ModelInfo model) async {
     final service = ref.read(modelDownloadServiceProvider);
-    service.selectModel(model);
+    await service.selectModel(model);
     ref.invalidate(modelStatusProvider);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Selected: ${model.name}')));
     Navigator.pop(context);
