@@ -106,7 +106,10 @@ jobs:
 
       # Code generation (kept as a setup step so Android/iOS jobs don't duplicate work)
       - name: Run code generation
-        run: flutter pub run build_runner build --delete-conflicting-outputs
+        run: |
+          flutter pub run build_runner build --delete-conflicting-outputs
+          # Re-run pub get so analyzer can see the newly generated part files
+          flutter pub get
 
       - name: Detect generated code
         id: detect-generated
