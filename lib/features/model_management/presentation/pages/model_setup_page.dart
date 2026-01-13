@@ -47,13 +47,7 @@ class _ModelSetupPageState extends ConsumerState<ModelSetupPage> {
 
         await bugsnag.notify(
           Exception('AI Service not ready when trying to navigate to chat'),
-          (event) {
-            event.context = 'Model Setup Page';
-            event.addMetadata('aiService', {
-              'isReady': aiServiceState.isReady,
-              'error': aiServiceState.error,
-            });
-          },
+          null,
         );
 
         setState(() {
@@ -79,12 +73,7 @@ class _ModelSetupPageState extends ConsumerState<ModelSetupPage> {
       debugPrint('❌ Error in _initializeAndGoToChat: $e');
       debugPrint('Stack trace: $stackTrace');
 
-      await bugsnag.notify(
-        e,
-        (event) {
-          event.context = 'Model Setup Page - Initialize and Go to Chat';
-        },
-      );
+      await bugsnag.notify(e, stackTrace);
 
       if (!mounted) return;
 

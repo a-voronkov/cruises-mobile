@@ -23,10 +23,7 @@ final modelStatusProvider = FutureProvider<bool>((ref) async {
       debugPrint('❌ AI Service not initialized');
       await bugsnag.notify(
         Exception('AI Service initialization failed'),
-        (event) {
-          event.context = 'Model Status Check';
-          event.severity = Severity.warning;
-        },
+        stackTrace,
       );
     } else {
       debugPrint('✅ AI Service is ready');
@@ -36,13 +33,7 @@ final modelStatusProvider = FutureProvider<bool>((ref) async {
   } catch (e, stackTrace) {
     debugPrint('❌ Error checking model status: $e');
     debugPrint('Stack trace: $stackTrace');
-    await bugsnag.notify(
-      e,
-      (event) {
-        event.context = 'Model Status Check';
-        event.severity = Severity.error;
-      },
-    );
+    await bugsnag.notify(e, stackTrace);
     return false;
   }
 });
