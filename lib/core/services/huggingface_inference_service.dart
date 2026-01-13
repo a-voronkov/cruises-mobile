@@ -77,10 +77,21 @@ class HuggingFaceInferenceService {
           return result[0]['generated_text'] as String? ?? '';
         }
         return '';
+      } else if (response.statusCode == 410) {
+        debugPrint('HuggingFaceInferenceService: Model not loaded (410)');
+        debugPrint('Model: $modelId');
+        throw Exception(
+          'Model "$modelId" is not available via Inference API. '
+          'This model requires local inference (ONNX Runtime). '
+          'Please use a model that supports cloud inference, such as:\n'
+          '• meta-llama/Llama-3.2-1B-Instruct\n'
+          '• microsoft/Phi-3-mini-4k-instruct\n'
+          '• mistralai/Mistral-7B-Instruct-v0.2'
+        );
       } else {
         debugPrint('HuggingFaceInferenceService: Error ${response.statusCode}');
         debugPrint('Response: ${response.body}');
-        throw Exception('Failed to generate text: ${response.statusCode}');
+        throw Exception('Failed to generate text: ${response.statusCode}\n${response.body}');
       }
     } catch (e) {
       debugPrint('HuggingFaceInferenceService: Error generating text: $e');
@@ -149,6 +160,14 @@ class HuggingFaceInferenceService {
             }
           }
         }
+      } else if (streamedResponse.statusCode == 410) {
+        debugPrint('HuggingFaceInferenceService: Model not loaded (410)');
+        debugPrint('Model: $modelId');
+        throw Exception(
+          'Model "$modelId" is not available via Inference API. '
+          'This model requires local inference (ONNX Runtime). '
+          'Please use a model that supports cloud inference.'
+        );
       } else {
         throw Exception('Failed to generate text: ${streamedResponse.statusCode}');
       }

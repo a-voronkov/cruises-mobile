@@ -161,17 +161,57 @@ class _ModelSearchPageState extends ConsumerState<ModelSearchPage> {
   Widget _buildModelList(ModelSearchState state, ThemeData theme) {
     final modelsByAuthor = state.modelsByAuthor;
 
-    return ListView.builder(
+    return ListView(
       controller: _scrollController,
       padding: const EdgeInsets.all(8),
-      itemCount: modelsByAuthor.length,
-      itemBuilder: (context, index) {
-        final entry = modelsByAuthor.entries.elementAt(index);
-        return _AuthorSection(
-          author: entry.key,
-          models: entry.value,
-        );
-      },
+      children: [
+        // Info banner
+        Card(
+          color: theme.colorScheme.secondaryContainer,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      color: theme.colorScheme.onSecondaryContainer,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Important Note',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Downloaded ONNX models require local inference (not yet implemented). '
+                  'For now, the app uses HuggingFace cloud API with models like:\n'
+                  '• meta-llama/Llama-3.2-1B-Instruct\n'
+                  '• microsoft/Phi-3-mini-4k-instruct',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Model list
+        ...modelsByAuthor.entries.map((entry) {
+          return _AuthorSection(
+            author: entry.key,
+            models: entry.value,
+          );
+        }),
+      ],
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/huggingface_model_search_service.dart';
 import '../../../../core/services/huggingface_model_files_service.dart';
 import '../../../../core/services/model_download_service.dart';
@@ -311,10 +312,32 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
       final aiService = ref.read(aiServiceProvider);
       aiService.setModelId(widget.model.id);
 
+      // Save to preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('selected_model_id', widget.model.id);
+      await prefs.setString('selected_model_name', widget.model.modelName);
+
+      debugPrint('Model saved to preferences: ${widget.model.id}');
+
+      if (!mounted) return;
+
+      // Show success message with important note
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Model downloaded successfully!'),
-          backgroundColor: Colors.green,
+        SnackBar(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Model ${widget.model.modelName} downloaded!'),
+              const SizedBox(height: 4),
+              const Text(
+                'Note: Local ONNX inference not yet implemented. Using cloud API for now.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 5),
         ),
       );
 

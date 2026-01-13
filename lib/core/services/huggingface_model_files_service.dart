@@ -228,9 +228,15 @@ class HuggingFaceModelFilesService {
     return Map.fromEntries(sortedEntries);
   }
 
-  /// Fetch real file size using HEAD request
+  /// Fetch real file size using HEAD request with redirect following
   Future<void> _fetchRealSize(String repoId, HFModelFile file) async {
     try {
+      // If size is already known and non-zero, skip
+      if (file.size > 0) {
+        debugPrint('Size already known for ${file.path}: ${file.formattedSize}');
+        return;
+      }
+
       final url = file.getDownloadUrl(repoId);
       final uri = Uri.parse(url);
 
@@ -238,15 +244,51 @@ class HuggingFaceModelFilesService {
         if (_apiKey != null) 'Authorization': 'Bearer $_apiKey',
       };
 
-      final response = await _client.head(uri, headers: headers);
+      debugPrint('Fetching size for ${file.path} from $url');
 
-      if (response.statusCode == 200 || response.statusCode == 302) {
-        final contentLength = response.headers['content-length'];
-        if (contentLength != null) {
-          file.size = int.tryParse(contentLength) ?? file.size;
-          debugPrint('Fetched size for ${file.path}: ${file.formattedSize}');
+      // Try HEAD request first (follows redirects automatically)
+      try {
+        final request = http.Request('HEAD', uri);
+        request.headers.addAll(headers);
+        request.followRedirects = true;
+        request.maxRedirects = 5;
+
+        final streamedResponse = await _client.send(request);
+
+        if (streamedResponse.statusCode == 200) {
+          final contentLength = streamedResponse.headers['content-length'];
+          if (contentLength != null) {
+            final size = int.tryParse(contentLength);
+            if (size != null && size > 0) {
+              file.size = size;
+              debugPrint('✓ Fetched size for ${file.path}: ${file.formattedSize}');
+              return;
+            }
+          }
         }
+      } catch (e) {
+        debugPrint('HEAD request failed for ${file.path}: $e');
       }
+
+      // Fallback: Try to get size from LFS pointer API
+      try {
+        final lfsUri = Uri.parse('https://huggingface.co/api/models/$repoId/tree/main/${file.path}');
+        final lfsResponse = await _client.get(lfsUri, headers: headers);
+
+        if (lfsResponse.statusCode == 200) {
+          final data = json.decode(lfsResponse.body) as Map<String, dynamic>;
+          final size = (data['size'] as num?)?.toInt();
+          if (size != null && size > 0) {
+            file.size = size;
+            debugPrint('✓ Fetched size from API for ${file.path}: ${file.formattedSize}');
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint('API request failed for ${file.path}: $e');
+      }
+
+      debugPrint('⚠ Could not fetch size for ${file.path}');
     } catch (e) {
       debugPrint('Failed to fetch size for ${file.path}: $e');
     }
