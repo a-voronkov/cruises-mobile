@@ -28,20 +28,27 @@ class HFModelFile {
   /// Get quantization type from filename (e.g., "int8", "fp16", "q4")
   String? get quantization {
     final fileName = path.toLowerCase();
-    
+
     // ONNX quantization patterns
-    if (fileName.contains('int8')) return 'INT8';
-    if (fileName.contains('int4')) return 'INT4';
-    if (fileName.contains('fp16')) return 'FP16';
-    if (fileName.contains('fp32')) return 'FP32';
-    
+    if (fileName.contains('_q8') || fileName.contains('q8.onnx')) return 'Q8';
+    if (fileName.contains('_q4') || fileName.contains('q4.onnx')) return 'Q4';
+    if (fileName.contains('_int8') || fileName.contains('int8')) return 'INT8';
+    if (fileName.contains('_int4') || fileName.contains('int4')) return 'INT4';
+    if (fileName.contains('_fp16') || fileName.contains('fp16')) return 'FP16';
+    if (fileName.contains('_fp32') || fileName.contains('fp32')) return 'FP32';
+
     // GGUF quantization patterns
     if (fileName.contains('q4_k_m')) return 'Q4_K_M';
     if (fileName.contains('q5_k_m')) return 'Q5_K_M';
     if (fileName.contains('q6_k')) return 'Q6_K';
     if (fileName.contains('q8_0')) return 'Q8_0';
     if (fileName.contains('f16')) return 'F16';
-    
+
+    // Default for ONNX files without explicit quantization
+    if (fileName.endsWith('.onnx') && !fileName.contains('_data')) {
+      return 'Default';
+    }
+
     return null;
   }
 
@@ -77,71 +84,110 @@ class HuggingFaceModelFilesService {
   })  : _apiKey = apiKey,
         _client = client ?? http.Client();
 
-  /// Get list of files for a model repository
-  /// 
+  /// Get list of files for a model repository (recursively)
+  ///
   /// [repoId] - HuggingFace repository ID (e.g., "meta-llama/Llama-3.2-1B-Instruct")
   /// [fileType] - Filter by file extension (e.g., "onnx", "gguf")
   Future<List<HFModelFile>> getModelFiles({
     required String repoId,
     String? fileType,
   }) async {
+    final allFiles = <HFModelFile>[];
+
+    // Recursively fetch files from all directories
+    await _fetchFilesRecursive(repoId, '', allFiles);
+
+    // Filter files
+    final filteredFiles = allFiles.where((file) {
+      // Filter by file type if specified
+      if (fileType != null) {
+        final ext = file.path.toLowerCase().split('.').last;
+        if (ext != fileType.toLowerCase()) return false;
+      }
+
+      // Only include model files (ONNX or GGUF)
+      return file.isONNX || file.isGGUF;
+    }).toList();
+
+    debugPrint('Found ${filteredFiles.length} model files (total: ${allFiles.length})');
+    return filteredFiles;
+  }
+
+  /// Recursively fetch files from a directory
+  Future<void> _fetchFilesRecursive(
+    String repoId,
+    String path,
+    List<HFModelFile> accumulator,
+  ) async {
     try {
-      final uri = Uri.parse('https://huggingface.co/api/models/$repoId/tree/main');
-      
+      final uri = path.isEmpty
+          ? Uri.parse('https://huggingface.co/api/models/$repoId/tree/main')
+          : Uri.parse('https://huggingface.co/api/models/$repoId/tree/main/$path');
+
       final headers = <String, String>{
         'Accept': 'application/json',
         if (_apiKey != null) 'Authorization': 'Bearer $_apiKey',
       };
 
-      debugPrint('Fetching model files from: $uri');
+      debugPrint('Fetching files from: $uri');
       final response = await _client.get(uri, headers: headers);
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body) as List<dynamic>;
-        final files = data
-            .map((json) => HFModelFile.fromJson(json as Map<String, dynamic>))
-            .where((file) {
-              // Filter out directories
-              if (file.type != 'file') return false;
 
-              // Filter by file type if specified
-              if (fileType != null) {
-                final ext = file.path.toLowerCase().split('.').last;
-                if (ext != fileType.toLowerCase()) return false;
-              }
+        for (final item in data) {
+          final file = HFModelFile.fromJson(item as Map<String, dynamic>);
 
-              // Only include model files (ONNX or GGUF)
-              return file.isONNX || file.isGGUF;
-            })
-            .toList();
-
-        debugPrint('Found ${files.length} model files');
-        return files;
+          if (file.type == 'directory') {
+            // Recursively fetch files from subdirectory
+            await _fetchFilesRecursive(repoId, file.path, accumulator);
+          } else {
+            // Add file to accumulator
+            accumulator.add(file);
+          }
+        }
       } else if (response.statusCode == 404) {
-        debugPrint('Model repository not found: $repoId');
-        return [];
+        debugPrint('Path not found: $path');
       } else {
         debugPrint('HF API error: ${response.statusCode}');
         debugPrint('Response: ${response.body}');
-        throw Exception('Failed to fetch model files: ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('Error fetching model files: $e');
-      rethrow;
+      debugPrint('Error fetching files from $path: $e');
     }
   }
 
   /// Get ONNX files grouped by quantization
+  ///
+  /// Groups main .onnx files with their _data files
   Future<Map<String, List<HFModelFile>>> getONNXFilesByQuantization(String repoId) async {
-    final files = await getModelFiles(repoId: repoId, fileType: 'onnx');
-    
+    final allFiles = await getModelFiles(repoId: repoId, fileType: 'onnx');
+
+    // Filter to only main .onnx files (not _data files)
+    final mainFiles = allFiles.where((file) {
+      final fileName = file.path.toLowerCase();
+      return fileName.endsWith('.onnx') && !fileName.contains('_data');
+    }).toList();
+
     final grouped = <String, List<HFModelFile>>{};
-    for (final file in files) {
+    for (final file in mainFiles) {
       final quant = file.quantization ?? 'Unknown';
       grouped.putIfAbsent(quant, () => []).add(file);
     }
-    
-    return grouped;
+
+    // Sort quantizations by quality (higher quality first)
+    final sortedEntries = grouped.entries.toList()
+      ..sort((a, b) {
+        final order = ['FP32', 'FP16', 'Q8', 'INT8', 'Q4', 'INT4', 'Default', 'Unknown'];
+        final aIndex = order.indexOf(a.key);
+        final bIndex = order.indexOf(b.key);
+        if (aIndex == -1 && bIndex == -1) return a.key.compareTo(b.key);
+        if (aIndex == -1) return 1;
+        if (bIndex == -1) return -1;
+        return aIndex.compareTo(bIndex);
+      });
+
+    return Map.fromEntries(sortedEntries);
   }
 
   void dispose() {

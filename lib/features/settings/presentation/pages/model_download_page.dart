@@ -458,9 +458,21 @@ class _FileListTile extends StatelessWidget {
         fileName,
         style: theme.textTheme.bodyMedium,
       ),
-      subtitle: Text(
-        file.formattedSize,
-        style: theme.textTheme.bodySmall,
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            file.formattedSize,
+            style: theme.textTheme.bodySmall,
+          ),
+          Text(
+            'Note: May include additional _data files',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontSize: 11,
+            ),
+          ),
+        ],
       ),
       trailing: FilledButton.icon(
         onPressed: onDownload,
