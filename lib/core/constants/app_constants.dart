@@ -6,25 +6,26 @@ class AppConstants {
   static const String appName = 'Cruises Assistant';
   static const String appVersion = '1.0.0';
 
-  // Model Configuration - LiquidAI LFM2.5-1.2B-Instruct
-  static const String modelName = 'LFM2.5-1.2B-Instruct';
-  static const String modelVersion = 'GGUF';
+  // Model Configuration - HuggingFace API
+  static const String defaultModelId = 'meta-llama/Llama-3.2-1B-Instruct';
+  static const String modelName = 'Llama-3.2-1B-Instruct';
+  static const String modelVersion = 'HF-API';
+
+  // Legacy GGUF configuration (deprecated, kept for backwards compatibility)
   static const String modelFileName = 'lfm2.5-1.2b-instruct-q4_k_m.gguf';
-
-  // Model Server Configuration
-  static const String modelServerBaseUrl = 'https://cruises.voronkov.club/models';
-
-  // Model Manifest URL (for fetching available models list)
-  static const String modelManifestUrl = '$modelServerBaseUrl/manifest.json';
-
-  // Model Download URL (custom server)
-  static const String modelDownloadUrl = '$modelServerBaseUrl/$modelFileName';
-
-  // Model size in bytes (approximate - Q4_K_M quantization ~700MB)
   static const int modelSizeBytes = 700000000; // ~700MB
-
-  // Model local path (relative to app documents directory)
   static const String modelLocalPath = 'models/$modelFileName';
+
+  // HuggingFace Configuration
+  static const String huggingFaceBaseUrl = 'https://huggingface.co';
+  static const String huggingFaceApiUrl = 'https://api-inference.huggingface.co';
+
+  // Model Manifest URL (HuggingFace models list)
+  static const String modelManifestUrl = 'https://huggingface.co/models?pipeline_tag=text-generation&sort=trending';
+
+  // Legacy model server (deprecated)
+  static const String modelServerBaseUrl = 'https://cruises.voronkov.club/models';
+  static const String modelDownloadUrl = '$modelServerBaseUrl/$modelFileName';
 
   // Storage Keys
   static const String modelStorageKey = 'llm_model';
