@@ -110,15 +110,15 @@ class AIService {
   }
 
   /// Generate text with streaming response
-  /// 
-  /// [prompt] - Input prompt
+  ///
+  /// [messages] - List of conversation messages in format: [{'role': 'user', 'content': '...'}]
   /// [maxTokens] - Maximum number of tokens to generate
   /// [temperature] - Sampling temperature (0.0 to 1.0)
   /// [topP] - Nucleus sampling parameter
-  /// 
+  ///
   /// Returns a stream of text chunks
   Stream<String> generateStream({
-    required String prompt,
+    required List<Map<String, String>> messages,
     int? maxTokens,
     double? temperature,
     double? topP,
@@ -132,6 +132,9 @@ class AIService {
     }
 
     try {
+      // Convert messages to prompt format
+      final prompt = _formatMessagesToPrompt(messages);
+
       yield* _hfService!.generateStream(
         modelId: _currentModelId!,
         prompt: prompt,
@@ -143,6 +146,27 @@ class AIService {
       debugPrint('AIService: Stream generation failed: $e');
       rethrow;
     }
+  }
+
+  /// Convert messages to prompt format
+  String _formatMessagesToPrompt(List<Map<String, String>> messages) {
+    final buffer = StringBuffer();
+
+    for (final message in messages) {
+      final role = message['role'] ?? 'user';
+      final content = message['content'] ?? '';
+
+      if (role == 'system') {
+        buffer.write('System: $content\n\n');
+      } else if (role == 'user') {
+        buffer.write('User: $content\n\n');
+      } else if (role == 'assistant') {
+        buffer.write('Assistant: $content\n\n');
+      }
+    }
+
+    buffer.write('Assistant:');
+    return buffer.toString();
   }
 
   /// Dispose of resources

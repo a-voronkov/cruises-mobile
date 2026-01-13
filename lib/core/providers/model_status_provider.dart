@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../services/llama_service_provider.dart' show modelDownloadServiceProvider;
+import '../services/ai_service_provider.dart' show modelDownloadServiceProvider;
 
 /// Global provider to check whether the currently selected model is downloaded.
 ///

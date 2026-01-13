@@ -5,7 +5,7 @@ import '../widgets/chat_app_bar.dart';
 import '../widgets/message_bubble.dart';
 import '../providers/chat_notifier.dart';
 import '../../domain/entities/message.dart';
-import '../../../../core/services/llama_service_provider.dart';
+import '../../../../core/services/ai_service_provider.dart';
 
 /// Main chat page with ChatGPT-like interface
 class ChatPage extends ConsumerStatefulWidget {
@@ -59,7 +59,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final chatState = ref.watch(chatNotifierProvider);
-    final modelState = ref.watch(modelInitializationProvider);
+    final aiServiceState = ref.watch(aiServiceStateProvider);
 
     // Auto-scroll when messages change
     ref.listen(chatNotifierProvider, (previous, next) {
@@ -69,17 +69,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       }
     });
 
-    // Check if model is ready for chat
-    final bool canChat = modelState.isInitialized && !chatState.isGenerating;
+    // Check if model is ready for chat (cloud service is always ready)
+    final bool canChat = aiServiceState.isReady && !chatState.isGenerating;
 
     return Scaffold(
       appBar: const ChatAppBar(),
       body: Column(
         children: [
-          // Model status banner
-          if (!modelState.isInitialized)
-            _buildModelStatusBanner(modelState),
-
           // Error banner
           if (chatState.error != null)
             _buildErrorBanner(chatState.error!),
@@ -109,33 +105,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
 
-  Widget _buildModelStatusBanner(ModelInitializationState modelState) {
+  Widget _buildModelStatusBanner(AIServiceState aiServiceState) {
     final theme = Theme.of(context);
 
-    if (modelState.isLoading) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        color: theme.colorScheme.primaryContainer,
-        child: Row(
-          children: [
-            const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Loading AI model... ${(modelState.progress * 100).toStringAsFixed(0)}%',
-                style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (modelState.error != null) {
+    if (aiServiceState.error != null) {
       return Container(
         padding: const EdgeInsets.all(12),
         color: theme.colorScheme.errorContainer,
@@ -145,13 +118,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                modelState.error!,
+                aiServiceState.error!,
                 style: TextStyle(color: theme.colorScheme.onErrorContainer),
               ),
-            ),
-            TextButton(
-              onPressed: _initializeModelIfNeeded,
-              child: const Text('Retry'),
             ),
           ],
         ),

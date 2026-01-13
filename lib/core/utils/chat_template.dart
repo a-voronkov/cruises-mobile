@@ -222,5 +222,24 @@ class ChatTemplate {
 
     return buffer.toString();
   }
+
+  /// Format cruise context into a string for system prompt
+  static String formatCruiseContext(CruiseContext context) {
+    final buffer = StringBuffer();
+
+    if (context.selectedCruise != null) {
+      buffer.write('Current cruise: ${context.selectedCruise!.name}. ');
+    }
+
+    if (context.selectedDestination != null) {
+      buffer.write('Destination: ${context.selectedDestination}. ');
+    }
+
+    if (context.preferences.isNotEmpty) {
+      buffer.write('User preferences: ${context.preferences.join(", ")}. ');
+    }
+
+    return buffer.toString();
+  }
 }
 

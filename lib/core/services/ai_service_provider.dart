@@ -13,9 +13,8 @@ final modelDownloadServiceProvider = Provider<ModelDownloadService>((ref) {
 });
 
 /// Provider for AI service state
-final aiServiceStateProvider = StateNotifierProvider<AIServiceStateNotifier, AIServiceState>((ref) {
-  final aiService = ref.read(aiServiceProvider);
-  return AIServiceStateNotifier(aiService);
+final aiServiceStateProvider = Provider<AIServiceState>((ref) {
+  return const AIServiceState();
 });
 
 /// State for AI service
@@ -36,29 +35,6 @@ class AIServiceState {
       isReady: isReady ?? this.isReady,
       error: error ?? this.error,
     );
-  }
-}
-
-/// Notifier for managing AI service state
-class AIServiceStateNotifier extends StateNotifier<AIServiceState> {
-  final AIService _aiService;
-
-  AIServiceStateNotifier(this._aiService)
-      : super(const AIServiceState());
-
-  /// Check if service is ready
-  bool isReady() {
-    return state.isReady;
-  }
-
-  /// Set error state
-  void setError(String error) {
-    state = state.copyWith(error: error);
-  }
-
-  /// Clear error state
-  void clearError() {
-    state = state.copyWith(error: null);
   }
 }
 

@@ -74,7 +74,8 @@ class _ModelInitializationPageState
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
                   onPressed: () {
-                    ref.read(aiServiceStateProvider.notifier).clearError();
+                    // Refresh the page
+                    Navigator.of(context).pushReplacementNamed('/chat');
                   },
                   icon: const Icon(Icons.refresh),
                   label: const Text('Retry'),
