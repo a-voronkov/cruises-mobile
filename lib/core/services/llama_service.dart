@@ -14,10 +14,11 @@ import '../constants/app_constants.dart';
 class LlamaService {
   LlamaParent? _llamaParent;
   bool _isInitialized = false;
+  bool _isDisposed = false;
   String? _modelPath;
 
   /// Check if the service is initialized and ready for inference
-  bool get isInitialized => _isInitialized;
+  bool get isInitialized => _isInitialized && !_isDisposed;
 
   /// Get the current model path
   String? get modelPath => _modelPath;
@@ -36,10 +37,13 @@ class LlamaService {
     Map<String, Object> diagnostics = {};
 
     try {
-      if (_isInitialized) {
+      if (_isInitialized && !_isDisposed) {
         debugPrint('LlamaService: Already initialized');
         return true;
       }
+
+      // Reset disposed flag if reinitializing
+      _isDisposed = false;
 
       onProgress?.call(0.1);
 
@@ -53,6 +57,9 @@ class LlamaService {
       diagnostics['appDocumentsDir'] = (await getApplicationDocumentsDirectory()).path;
       diagnostics['platform'] = Platform.operatingSystem;
       diagnostics['platformVersion'] = Platform.operatingSystemVersion;
+
+      // Update global metadata at start
+      _updateGlobalMetadata(diagnostics, 'initializing');
 
       if (_modelPath == null) {
         diagnostics['modelExists'] = false;
@@ -195,17 +202,29 @@ class LlamaService {
 	      await _llamaParent!.init();
 
 	      diagnostics['useMemorymap'] = useMemorymap;
+
+	      // Update global metadata on successful init
+	      _updateGlobalMetadata(diagnostics, 'initialized');
 	      break;
 	    } catch (e, st) {
 	      diagnostics['llamaInitError_attempt_$attemptIndex'] = e.toString();
 
+	      // Update global metadata on error
+	      _updateGlobalMetadata(diagnostics, 'init_error_attempt_$attemptIndex');
+
 	      // Best-effort cleanup before retry.
-	      try {
-	        await _llamaParent?.dispose();
-	      } catch (_) {
-	        // ignore
+	      if (_llamaParent != null) {
+	        try {
+	          debugPrint('LlamaService: Cleaning up failed initialization attempt $attemptIndex');
+	          await _llamaParent!.dispose();
+	          debugPrint('LlamaService: Cleanup successful');
+	        } catch (disposeError) {
+	          debugPrint('LlamaService: Error during cleanup: $disposeError');
+	          // Ignore dispose errors during cleanup
+	        } finally {
+	          _llamaParent = null;
+	        }
 	      }
-	      _llamaParent = null;
 
 	      if (attemptIndex == mmapAttempts.length - 1) {
 	        // No more retries.
@@ -226,6 +245,9 @@ class LlamaService {
       // Add error info to diagnostics
       diagnostics['error'] = e.toString();
       diagnostics['stage'] = 'llama_init';
+
+      // Update global metadata on final error
+      _updateGlobalMetadata(diagnostics, 'failed');
 
       // Report to Bugsnag with full diagnostics
       await bugsnag.notify(
@@ -249,8 +271,27 @@ class LlamaService {
     }
   }
 
+  /// Update global Bugsnag metadata so LLAMA tab is visible in all errors
+  void _updateGlobalMetadata(Map<String, Object> diagnostics, String status) {
+    bugsnag.addMetadata('llama', {
+      ...diagnostics,
+      'status': status,
+      'lastUpdate': DateTime.now().toIso8601String(),
+    });
+    bugsnag.addMetadata('app_config', {
+      'modelFileName': AppConstants.modelFileName,
+      'modelServerBaseUrl': AppConstants.modelServerBaseUrl,
+      'contextLength': AppConstants.contextLength,
+      'numThreads': AppConstants.numThreads,
+      'temperature': AppConstants.temperature,
+    });
+  }
+
   /// Report diagnostics to Bugsnag for debugging
   Future<void> _reportDiagnostics(String message, Map<String, Object> diagnostics) async {
+    // Update global metadata first
+    _updateGlobalMetadata(diagnostics, 'error');
+
     await bugsnag.notify(
       Exception(message),
       StackTrace.current,
@@ -268,20 +309,65 @@ class LlamaService {
   }
 
   /// Generate text from a prompt with streaming support
-  /// 
+  ///
   /// [prompt] - The input prompt (should be pre-formatted with ChatTemplate)
-  /// 
+  ///
   /// Returns a stream of generated tokens
   Stream<String> generateStream(String prompt) {
+    if (_isDisposed) {
+      throw StateError('LlamaService has been disposed. Cannot generate text.');
+    }
+
     if (!_isInitialized || _llamaParent == null) {
       throw StateError('LlamaService not initialized. Call initialize() first.');
     }
 
-    // Send prompt to the isolate
-    _llamaParent!.sendPrompt(prompt);
+    try {
+      // Send prompt to the isolate
+      _llamaParent!.sendPrompt(prompt);
 
-    // Return the stream of responses
-    return _llamaParent!.stream;
+      // Return the stream with error handling
+      return _llamaParent!.stream.handleError((error, stackTrace) {
+        debugPrint('LlamaService: Stream error: $error');
+
+        // Report to Bugsnag
+        bugsnag.notify(
+          error,
+          stackTrace,
+          callback: (event) {
+            event.addMetadata('llama', {
+              'error': error.toString(),
+              'stage': 'stream_generation',
+              'isDisposed': _isDisposed,
+              'isInitialized': _isInitialized,
+            });
+            return true;
+          },
+        );
+
+        // Re-throw to propagate to caller
+        throw error;
+      });
+    } catch (e, st) {
+      debugPrint('LlamaService: Error in generateStream: $e');
+
+      // Report to Bugsnag
+      bugsnag.notify(
+        e,
+        st,
+        callback: (event) {
+          event.addMetadata('llama', {
+            'error': e.toString(),
+            'stage': 'generate_stream_setup',
+            'isDisposed': _isDisposed,
+            'isInitialized': _isInitialized,
+          });
+          return true;
+        },
+      );
+
+      rethrow;
+    }
   }
 
   /// Generate text from a prompt (non-streaming)
@@ -306,11 +392,45 @@ class LlamaService {
 
   /// Dispose of resources and cleanup
   Future<void> dispose() async {
-    if (_llamaParent != null) {
-      await _llamaParent!.dispose();
-      _llamaParent = null;
+    if (_isDisposed) {
+      debugPrint('LlamaService: Already disposed');
+      return;
     }
+
+    debugPrint('LlamaService: Disposing...');
+    _isDisposed = true;
     _isInitialized = false;
+
+    if (_llamaParent != null) {
+      try {
+        await _llamaParent!.dispose();
+        debugPrint('LlamaService: LlamaParent disposed successfully');
+      } catch (e, st) {
+        debugPrint('LlamaService: Error disposing LlamaParent: $e');
+
+        // Report to Bugsnag but don't rethrow
+        await bugsnag.notify(
+          e,
+          st,
+          callback: (event) {
+            event.addMetadata('llama', {
+              'error': e.toString(),
+              'stage': 'dispose',
+            });
+            return true;
+          },
+        );
+      } finally {
+        _llamaParent = null;
+      }
+    }
+
+    // Update global metadata
+    _updateGlobalMetadata({
+      'disposed': true,
+      'disposedAt': DateTime.now().toIso8601String(),
+    }, 'disposed');
+
     debugPrint('LlamaService: Disposed');
   }
 
