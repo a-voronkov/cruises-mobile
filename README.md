@@ -15,7 +15,7 @@ An autonomous travel planning assistant mobile application with embedded LLM cap
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Quick Start](#quick-start)
-  - [LLM Model Setup](#llm-model-setup)
+  - [AI Model Setup](#ai-model-setup)
 - [Building](#building)
 - [CI/CD](#cicd)
 - [Documentation](#documentation)
@@ -26,24 +26,24 @@ An autonomous travel planning assistant mobile application with embedded LLM cap
 
 ## Overview
 
-Cruises Mobile is a Flutter-based mobile application that provides intelligent travel planning assistance using a locally-running Large Language Model (LLM). The app features a ChatGPT-like interface with support for text, voice, and file inputs.
+Cruises Mobile is a Flutter-based mobile application that provides intelligent travel planning assistance using AI-powered language models. The app features a ChatGPT-like interface with support for text, voice, and file inputs.
 
 **Key Highlights:**
-- 🎯 **Privacy-First**: All AI processing happens on-device
-- 🚀 **High Performance**: Optimized for mobile with 82 tok/s on NPU
-- 🌍 **Multilingual**: Supports 8 languages (EN, AR, ZH, FR, DE, JA, KO, ES)
+- 🤖 **AI-Powered**: Uses HuggingFace Inference API for state-of-the-art language models
+- 🚀 **Cloud-Based**: Access to latest models without device limitations
+- 🌍 **Multilingual**: Supports multiple languages through advanced LLMs
 - 📱 **Cross-Platform**: Native Android and iOS support
 
 ## Key Features
 
-- 🤖 **Local LLM Integration**: Uses LiquidAI LFM2.5-1.2B-Instruct model for offline AI assistance
+- 🤖 **HuggingFace Integration**: Uses Llama-3.2-1B-Instruct and other models via HF API
 - 💬 **Chat Interface**: Clean, modern chat UI with light and dark themes
 - 🎤 **Voice Input**: Speech-to-text functionality for hands-free interaction
 - 📸 **Media Support**: Send photos and files from your device
-- 🌐 **Offline-First**: AI processing happens locally on your device
+- 🌐 **Cloud-Powered**: Access to powerful AI models via HuggingFace
 - 🎨 **Modern UI**: ChatGPT-inspired design with Material Design 3
-- ⚡ **Fast Inference**: Optimized with llama.cpp for mobile performance
-- 🔒 **Privacy**: No data leaves your device
+- ⚡ **Streaming Responses**: Real-time text generation with SSE
+- 🔄 **Model Selection**: Choose from various HuggingFace models
 
 ## Technology Stack
 
@@ -53,9 +53,10 @@ Cruises Mobile is a Flutter-based mobile application that provides intelligent t
 | **Language** | Dart 3.7.0+ |
 | **State Management** | Riverpod 2.x |
 | **Local Storage** | Hive |
-| **Network** | Dio |
-| **LLM Runtime** | llama.cpp (via llama_cpp_dart) |
-| **LLM Model** | LiquidAI LFM2.5-1.2B-Instruct (GGUF Q4_K_M) |
+| **Network** | Dio, HTTP |
+| **AI/ML** | HuggingFace Inference API |
+| **LLM Model** | Llama-3.2-1B-Instruct (via HF API) |
+| **Error Tracking** | Bugsnag |
 | **Code Generation** | build_runner, freezed, json_serializable |
 | **Dependency Injection** | get_it, injectable |
 
@@ -119,36 +120,34 @@ lib/
    flutter pub run build_runner build --delete-conflicting-outputs
    ```
 
-4. **Download LLM model** (~700 MB):
-   ```bash
-   cd models
-   wget https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF/resolve/main/lfm2.5-1.2b-instruct-q4_k_m.gguf
-   ```
+4. **Set up HuggingFace API key:**
+   - Get your API key from [HuggingFace](https://huggingface.co/settings/tokens)
+   - Add to GitHub Secrets as `HF_TOKEN` (for CI/CD)
+   - Or configure in app settings (for local development)
 
-5. **Setup llama.cpp library:**
-   - See [docs/LLAMA_CPP_SETUP.md](docs/LLAMA_CPP_SETUP.md) for platform-specific instructions
-
-6. **Run the app:**
+5. **Run the app:**
    ```bash
    flutter run
    ```
 
 📖 **Detailed setup**: [QUICKSTART.md](QUICKSTART.md)
 
-### LLM Model Setup
+### AI Model Setup
 
-The app uses **LiquidAI LFM2.5-1.2B-Instruct** model:
+The app uses **HuggingFace Inference API** with **Llama-3.2-1B-Instruct** model:
 
-- **Size**: ~700 MB (GGUF Q4_K_M quantization)
-- **Context**: 32,768 tokens
-- **Performance**: 82 tok/s on mobile NPU, 239 tok/s on AMD CPU
-- **Memory**: Runs under 1GB RAM
+- **API**: HuggingFace Inference API (cloud-based)
+- **Model**: meta-llama/Llama-3.2-1B-Instruct
+- **Context**: 128K tokens
+- **Performance**: Real-time streaming responses
+- **Cost**: Free tier available, pay-as-you-go for production
 
-**Download options:**
-1. **Manual**: Download from [HuggingFace](https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF) and place in `models/` directory
-2. **Automatic**: App will download on first launch (future feature)
+**Setup:**
+1. **Get API Key**: Sign up at [HuggingFace](https://huggingface.co) and create an API token
+2. **Configure**: Add `HF_TOKEN` to your environment or app settings
+3. **Select Model**: Choose from various models in the app settings
 
-📖 **Model documentation**: [docs/LFM2.5_INTEGRATION.md](docs/LFM2.5_INTEGRATION.md)
+📖 **API documentation**: [HuggingFace Inference API](https://huggingface.co/docs/api-inference/index)
 
 ## Building
 
