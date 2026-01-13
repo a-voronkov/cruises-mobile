@@ -509,12 +509,19 @@ jobs:
         run: |
           flutter build ios --release --no-codesign
 
+      # Package iOS app as zip for easy download
+      - name: Package iOS app
+        run: |
+          cd build/ios/iphoneos
+          zip -r Runner.app.zip Runner.app
+          ls -lh Runner.app.zip
+
       # Upload iOS build artifact
       - name: Upload iOS build
         uses: actions/upload-artifact@v4
         with:
           name: ios-build
-          path: build/ios/iphoneos/Runner.app
+          path: build/ios/iphoneos/Runner.app.zip
           retention-days: 30
 
   ################################################################################
@@ -556,6 +563,12 @@ jobs:
           name: ios-build
           path: ./artifacts
 
+      # List downloaded artifacts for debugging
+      - name: List artifacts
+        run: |
+          echo "Downloaded artifacts:"
+          ls -lh ./artifacts/
+
       # Determine release version from pubspec.yaml
       - name: Determine release version
         id: release-tag
@@ -593,7 +606,7 @@ jobs:
             ### 📦 Artifacts
             - **Android APK**: `app-release.apk` - Ready for direct installation on Android devices
             - **Android AAB**: `app-release.aab` - For Google Play Store (requires signing)
-            - **iOS Build**: `Runner.app` - iOS application (requires code signing for installation)
+            - **iOS Build**: `Runner.app.zip` - iOS application for simulator/device (unzip to use)
 
             ### 📱 Installation
             **Android:**
@@ -601,8 +614,13 @@ jobs:
             2. Enable "Install from unknown sources" on your device
             3. Open the APK file to install
 
-            **iOS:**
-            1. Download `Runner.app`
+            **iOS Simulator:**
+            1. Download `Runner.app.zip`
+            2. Unzip the file to get `Runner.app`
+            3. Drag `Runner.app` to iOS Simulator or use: `xcrun simctl install booted Runner.app`
+
+            **iOS Device:**
+            1. Download and unzip `Runner.app.zip`
             2. Code sign the app with your Apple Developer certificate
             3. Install via Xcode or other deployment tools
 
@@ -620,7 +638,7 @@ jobs:
           files: |
             ./artifacts/app-release.apk
             ./artifacts/app-release.aab
-            ./artifacts/Runner.app/**/*
+            ./artifacts/Runner.app.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -632,7 +650,7 @@ jobs:
           echo "### 📦 Artifacts" >> $GITHUB_STEP_SUMMARY
           echo "- Android APK: $(ls -lh ./artifacts/app-release.apk | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
           echo "- Android AAB: $(ls -lh ./artifacts/app-release.aab | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
-          echo "- iOS Build: $(du -sh ./artifacts/Runner.app | awk '{print $1}')" >> $GITHUB_STEP_SUMMARY
+          echo "- iOS Build: $(ls -lh ./artifacts/Runner.app.zip | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🏷️ Release" >> $GITHUB_STEP_SUMMARY
           echo "Version: ${{ steps.release-tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
