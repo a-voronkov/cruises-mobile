@@ -34,7 +34,7 @@ class LlamaService {
     void Function(double progress)? onProgress,
   }) async {
     // Diagnostic info collected during initialization
-    Map<String, Object> diagnostics = {};
+    final Map<String, Object> diagnostics = {};
 
     try {
       if (_isInitialized && !_isDisposed) {
@@ -81,7 +81,7 @@ class LlamaService {
 
       // Validate model file size (should be at least 100MB for a valid GGUF model)
       final fileSize = await modelFile.length();
-      final fileStat = await modelFile.stat();
+      final fileStat = modelFile.statSync();
       const minValidSize = 100 * 1024 * 1024; // 100MB minimum
 
       diagnostics['fileSizeBytes'] = fileSize;
@@ -149,8 +149,8 @@ class LlamaService {
 	  // but on some Android devices SELinux/storage constraints can cause mmap to
 	  // fail. We try the preferred setting first, then retry once with the
 	  // opposite setting for compatibility.
-	  final preferredUseMemorymap = true;
-	  final mmapAttempts = preferredUseMemorymap ? <bool>[true, false] : <bool>[false, true];
+	  const preferredUseMemorymap = true;
+	  const mmapAttempts = <bool>[true, false];
 	  diagnostics['useMemorymapAttempts'] = mmapAttempts;
 
 	  // nBatch impacts temporary allocations during prompt processing. A smaller
@@ -344,7 +344,7 @@ class LlamaService {
       _llamaParent!.sendPrompt(prompt);
 
       // Return the stream with error handling
-      return _llamaParent!.stream.handleError((error, stackTrace) {
+      return _llamaParent!.stream.handleError((Object error, StackTrace stackTrace) {
         debugPrint('LlamaService: Stream error: $error');
 
         // Report to Bugsnag
@@ -363,7 +363,7 @@ class LlamaService {
         );
 
         // Re-throw to propagate to caller
-        throw error;
+        Error.throwWithStackTrace(error, stackTrace);
       });
     } catch (e, st) {
       debugPrint('LlamaService: Error in generateStream: $e');
