@@ -407,37 +407,65 @@ jobs:
           path: build/app/outputs/bundle/release/app-release.aab
           retention-days: 30
 
-  # ################################################################################
-  # # BUILD iOS - Build APP with cached dependencies
-  # # TEMPORARILY DISABLED - No iOS device for testing, saves build time
-  # ################################################################################
-  # build-ios:
-  #   name: Build iOS APP
-  #   runs-on: self-hosted
-  #   needs: [check-build, setup]
-  #   if: needs.check-build.outputs.should-build == 'true'
-  #
-  #   env:
-  #     RUNNER_TOOL_CACHE: /Users/runner/hostedtoolcache
-  #     AGENT_TOOLSDIRECTORY: /Users/runner/hostedtoolcache
-  #
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Add Flutter to PATH
-  #       run: |
-  #         echo "$HOME/flutter/bin" >> $GITHUB_PATH
-  #         echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
-  #
-  #     # ... (iOS build steps disabled)
+  ################################################################################
+  # BUILD iOS - Build APP with cached dependencies
+  ################################################################################
+  build-ios:
+    name: Build iOS APP
+    runs-on: self-hosted
+    needs: [check-build, setup]
+    if: needs.check-build.outputs.should-build == 'true'
+
+    env:
+      RUNNER_TOOL_CACHE: /Users/runner/hostedtoolcache
+      AGENT_TOOLSDIRECTORY: /Users/runner/hostedtoolcache
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Add Flutter to PATH
+        run: |
+          echo "$HOME/flutter/bin" >> $GITHUB_PATH
+          echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+
+      # Download generated code from setup job
+      - name: Download generated code
+        if: needs.setup.outputs.has-generated-code == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-code
+          path: .
+
+      # Get dependencies (should be fast due to cache)
+      - name: Get dependencies
+        run: flutter pub get
+
+      # Install CocoaPods dependencies
+      - name: Install CocoaPods dependencies
+        run: |
+          cd ios
+          pod install --repo-update
+
+      # Build iOS app (no code signing for now)
+      - name: Build iOS app
+        run: |
+          flutter build ios --release --no-codesign
+
+      # Upload iOS build artifact
+      - name: Upload iOS build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: build/ios/iphoneos/Runner.app
+          retention-days: 30
 
   ################################################################################
   # CREATE RELEASE - Create GitHub release with artifacts (auto on every push)
   ################################################################################
   create-release:
     name: Create Release
-    needs: [check-build, build-android]  # Removed build-ios dependency
+    needs: [check-build, build-android, build-ios]
     runs-on: self-hosted
     if: needs.check-build.outputs.should-build == 'true'
     # Create release on EVERY successful build (push to main or manual dispatch)
@@ -464,13 +492,12 @@ jobs:
           name: android-aab
           path: ./artifacts
 
-      # iOS build temporarily disabled - uncomment when needed
-      # # Download iOS Simulator build
-      # - name: Download iOS Simulator build
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: ios-simulator
-      #     path: ./artifacts
+      # Download iOS build
+      - name: Download iOS build
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-build
+          path: ./artifacts
 
       # Determine release version from pubspec.yaml
       - name: Determine release version
@@ -509,6 +536,7 @@ jobs:
             ### 📦 Artifacts
             - **Android APK**: `app-release.apk` - Ready for direct installation on Android devices
             - **Android AAB**: `app-release.aab` - For Google Play Store (requires signing)
+            - **iOS Build**: `Runner.app` - iOS application (requires code signing for installation)
 
             ### 📱 Installation
             **Android:**
@@ -516,7 +544,10 @@ jobs:
             2. Enable "Install from unknown sources" on your device
             3. Open the APK file to install
 
-            > **Note:** iOS build is temporarily disabled. Will be re-enabled when iOS testing device is available.
+            **iOS:**
+            1. Download `Runner.app`
+            2. Code sign the app with your Apple Developer certificate
+            3. Install via Xcode or other deployment tools
 
             ### 📝 Changes
             See commit history for details: https://github.com/${{ github.repository }}/commits/${{ github.sha }}
@@ -532,6 +563,7 @@ jobs:
           files: |
             ./artifacts/app-release.apk
             ./artifacts/app-release.aab
+            ./artifacts/Runner.app/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -543,6 +575,7 @@ jobs:
           echo "### 📦 Artifacts" >> $GITHUB_STEP_SUMMARY
           echo "- Android APK: $(ls -lh ./artifacts/app-release.apk | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
           echo "- Android AAB: $(ls -lh ./artifacts/app-release.aab | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
+          echo "- iOS Build: $(du -sh ./artifacts/Runner.app | awk '{print $1}')" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🏷️ Release" >> $GITHUB_STEP_SUMMARY
           echo "Version: ${{ steps.release-tag.outputs.version }}" >> $GITHUB_STEP_SUMMARY
