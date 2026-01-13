@@ -23,7 +23,7 @@ final modelStatusProvider = FutureProvider<bool>((ref) async {
       debugPrint('❌ AI Service not initialized');
       await bugsnag.notify(
         Exception('AI Service initialization failed'),
-        stackTrace,
+        null,
       );
     } else {
       debugPrint('✅ AI Service is ready');

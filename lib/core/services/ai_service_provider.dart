@@ -23,7 +23,7 @@ final aiServiceInitializerProvider = FutureProvider<bool>((ref) async {
     debugPrint('=== AI Service Initialization ===');
     debugPrint('ApiConfig.isConfigured: ${ApiConfig.isConfigured}');
     debugPrint('ApiConfig.huggingFaceApiKey length: ${ApiConfig.huggingFaceApiKey.length}');
-    const firstChars = ApiConfig.huggingFaceApiKey.isEmpty
+    final firstChars = ApiConfig.huggingFaceApiKey.isEmpty
         ? "EMPTY"
         : ApiConfig.huggingFaceApiKey.substring(0, ApiConfig.huggingFaceApiKey.length > 10 ? 10 : ApiConfig.huggingFaceApiKey.length);
     debugPrint('ApiConfig.huggingFaceApiKey (first 10 chars): $firstChars...');
