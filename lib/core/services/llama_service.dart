@@ -197,8 +197,6 @@ class LlamaService {
 	      diagnostics['useMemorymap'] = useMemorymap;
 	      break;
 	    } catch (e, st) {
-	      lastInitError = e;
-	      lastInitStack = st;
 	      diagnostics['llamaInitError_attempt_$attemptIndex'] = e.toString();
 
 	      // Best-effort cleanup before retry.
