@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/llama_service_provider.dart';
+import '../../../../core/services/ai_service_provider.dart';
 
 /// Page for initializing the LLM model
 /// 
@@ -18,15 +18,12 @@ class _ModelInitializationPageState
   @override
   void initState() {
     super.initState();
-    // Start initialization when page loads
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(modelInitializationProvider.notifier).initialize();
-    });
+    // Cloud-based AI service is always ready, no initialization needed
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(modelInitializationProvider);
+    final state = ref.watch(aiServiceStateProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -62,23 +59,7 @@ class _ModelInitializationPageState
               const SizedBox(height: 48),
 
               // Progress indicator or error
-              if (state.isLoading) ...[
-                SizedBox(
-                  width: 200,
-                  child: LinearProgressIndicator(
-                    value: state.progress,
-                    backgroundColor: Colors.grey[300],
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Theme.of(context).primaryColor,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '${(state.progress * 100).toInt()}%',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ] else if (state.error != null) ...[
+              if (state.error != null) ...[
                 Icon(
                   Icons.error_outline,
                   size: 64,
@@ -93,12 +74,12 @@ class _ModelInitializationPageState
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
                   onPressed: () {
-                    ref.read(modelInitializationProvider.notifier).initialize();
+                    ref.read(aiServiceStateProvider.notifier).clearError();
                   },
                   icon: const Icon(Icons.refresh),
                   label: const Text('Retry'),
                 ),
-              ] else if (state.isInitialized) ...[
+              ] else if (state.isReady) ...[
                 Icon(
                   Icons.check_circle_outline,
                   size: 64,
@@ -130,8 +111,8 @@ class _ModelInitializationPageState
 
               const SizedBox(height: 48),
 
-              // Model info
-              if (state.isInitialized || state.isLoading)
+              // Service info
+              if (state.isReady)
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -142,16 +123,16 @@ class _ModelInitializationPageState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Model Information',
+                        'Service Information',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                       ),
                       const SizedBox(height: 8),
-                      _buildInfoRow('Model', 'LFM2.5-1.2B-Instruct'),
-                      _buildInfoRow('Size', '~700 MB'),
-                      _buildInfoRow('Context', '32K tokens'),
-                      _buildInfoRow('Languages', '8 languages'),
+                      _buildInfoRow('Provider', 'HuggingFace Inference API'),
+                      _buildInfoRow('Model', 'Qwen/Qwen2.5-72B-Instruct'),
+                      _buildInfoRow('Type', 'Cloud-based'),
+                      _buildInfoRow('Status', 'Always available'),
                     ],
                   ),
                 ),
@@ -162,19 +143,11 @@ class _ModelInitializationPageState
     );
   }
 
-  String _getStatusMessage(ModelInitializationState state) {
-    if (state.isLoading) {
-      if (state.progress < 0.3) {
-        return 'Locating model file...';
-      } else if (state.progress < 0.7) {
-        return 'Loading model into memory...';
-      } else {
-        return 'Initializing inference engine...';
-      }
-    } else if (state.error != null) {
-      return 'Failed to initialize model';
-    } else if (state.isInitialized) {
-      return 'Model loaded successfully!';
+  String _getStatusMessage(AIServiceState state) {
+    if (state.error != null) {
+      return 'Failed to connect to AI service';
+    } else if (state.isReady) {
+      return 'AI service ready!';
     } else {
       return 'Preparing AI assistant...';
     }

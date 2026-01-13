@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/model_status_provider.dart';
-import '../../../../core/services/llama_service_provider.dart' show modelDownloadServiceProvider;
+import '../../../../core/services/ai_service_provider.dart' show modelDownloadServiceProvider;
 import '../../../../main.dart';
 import '../providers/settings_provider.dart';
 import 'model_selection_page.dart';

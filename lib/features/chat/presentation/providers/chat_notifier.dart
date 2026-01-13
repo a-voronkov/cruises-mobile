@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:uuid/uuid.dart';
-import '../../../../core/services/llama_service_provider.dart';
+import '../../../../core/services/ai_service_provider.dart';
 import '../../../../core/utils/chat_template.dart';
 import '../../domain/entities/message.dart';
 import '../../data/datasources/chat_local_datasource_provider.dart';
@@ -137,11 +137,8 @@ How can I help you today?''',
     await dataSource.saveMessage(userMessage);
 
     try {
-      // Check if LLM is initialized
-      final llamaService = _ref.read(llamaServiceProvider);
-      if (!llamaService.isInitialized) {
-        throw StateError('AI model is not initialized');
-      }
+      // Get AI service
+      final aiService = _ref.read(aiServiceProvider);
 
       // Get cruise context for system prompt
       final cruiseContext = _ref.read(cruiseContextProvider);
@@ -151,16 +148,28 @@ How can I help you today?''',
           .where((m) => m.role != MessageRole.system)
           .toList();
 
-      // Format prompt with cruise context
-      final prompt = ChatTemplate.formatMessagesWithContext(
-        messages: messagesForLLM,
-        cruiseContext: cruiseContext,
-      );
+      // Convert to messages format for AI service
+      final messages = messagesForLLM.map((msg) {
+        return {
+          'role': msg.role == MessageRole.user ? 'user' : 'assistant',
+          'content': msg.content,
+        };
+      }).toList();
+
+      // Add system message with cruise context
+      final systemContent = cruiseContext != null
+          ? 'You are a helpful travel assistant. ${ChatTemplate.formatCruiseContext(cruiseContext)}'
+          : 'You are a helpful travel assistant.';
+
+      messages.insert(0, {
+        'role': 'system',
+        'content': systemContent,
+      });
 
       // Generate response stream
       final responseBuffer = StringBuffer();
 
-      await for (final token in llamaService.generateStream(prompt)) {
+      await for (final token in aiService.generateStream(messages: messages)) {
         responseBuffer.write(token);
         state = state.copyWith(currentResponse: responseBuffer.toString());
       }

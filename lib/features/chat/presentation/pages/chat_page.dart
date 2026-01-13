@@ -34,10 +34,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _initializeModelIfNeeded() {
-    final modelState = ref.read(modelInitializationProvider);
-    if (!modelState.isInitialized && !modelState.isLoading) {
-      ref.read(modelInitializationProvider.notifier).initialize();
-    }
+    // Cloud-based AI service is always ready, no initialization needed
   }
 
   @override

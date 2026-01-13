@@ -71,7 +71,8 @@ class HuggingFaceInferenceService {
       final response = await _client.post(url, headers: headers, body: body);
 
       if (response.statusCode == 200) {
-        final List<dynamic> result = json.decode(response.body);
+        final dynamic decoded = json.decode(response.body);
+        final List<dynamic> result = decoded as List<dynamic>;
         if (result.isNotEmpty && result[0] is Map) {
           return result[0]['generated_text'] as String? ?? '';
         }

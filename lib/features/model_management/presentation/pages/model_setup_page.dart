@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/model_info.dart';
 import '../../../../core/providers/model_download_providers.dart';
-import '../../../../core/services/llama_service_provider.dart' show modelInitializationProvider;
+import '../../../../core/services/ai_service_provider.dart';
 import '../../../../core/providers/model_status_provider.dart';
 import '../../../chat/presentation/pages/chat_page.dart';
 
@@ -24,8 +24,8 @@ class _ModelSetupPageState extends ConsumerState<ModelSetupPage> {
       _isInitializingModel = true;
     });
 
-    final modelNotifier = ref.read(modelInitializationProvider.notifier);
-    await modelNotifier.initialize();
+    // Cloud-based AI service is always ready, no initialization needed
+    await Future.delayed(const Duration(milliseconds: 500)); // Brief delay for UX
 
     if (!mounted) return;
 
