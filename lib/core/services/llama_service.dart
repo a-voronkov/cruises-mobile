@@ -96,6 +96,26 @@ class LlamaService {
 
       onProgress?.call(0.3);
 
+      // Read GGUF metadata for debugging before attempting to load
+      debugPrint('LlamaService: Reading GGUF metadata...');
+      final ggufMetadata = await readGgufMetadata(_modelPath!);
+      diagnostics['gguf'] = ggufMetadata;
+
+      debugPrint('LlamaService: GGUF version: ${ggufMetadata['ggufVersion']}');
+      debugPrint('LlamaService: Architecture: ${ggufMetadata['architecture']}');
+      debugPrint('LlamaService: Model name: ${ggufMetadata['modelName']}');
+      debugPrint('LlamaService: Tensor count: ${ggufMetadata['tensorCount']}');
+      debugPrint('LlamaService: Metadata KV count: ${ggufMetadata['metadataKvCount']}');
+
+      if (ggufMetadata.containsKey('error')) {
+        debugPrint('LlamaService: GGUF read error: ${ggufMetadata['error']}');
+      }
+      if (ggufMetadata.containsKey('metadataReadError')) {
+        debugPrint('LlamaService: GGUF metadata read error: ${ggufMetadata['metadataReadError']}');
+      }
+
+      onProgress?.call(0.4);
+
       // Set library path based on platform
       final libraryPath = await _getLibraryPath();
       diagnostics['libraryPath'] = libraryPath ?? 'default (embedded)';
@@ -298,6 +318,155 @@ class LlamaService {
     }
     // Other platforms: use default discovery
     return null;
+  }
+
+  /// Read GGUF file header and metadata for debugging
+  ///
+  /// GGUF format: https://github.com/ggerganov/ggml/blob/master/docs/gguf.md
+  /// Returns a map with file metadata or error information
+  Future<Map<String, dynamic>> readGgufMetadata(String filePath) async {
+    final result = <String, dynamic>{};
+    RandomAccessFile? file;
+
+    try {
+      final modelFile = File(filePath);
+      if (!await modelFile.exists()) {
+        result['error'] = 'File does not exist';
+        return result;
+      }
+
+      file = await modelFile.open(mode: FileMode.read);
+
+      // Read GGUF magic number (4 bytes): "GGUF" = 0x46554747
+      final magic = await file.read(4);
+      final magicStr = String.fromCharCodes(magic);
+      result['magic'] = magicStr;
+      result['magicHex'] = magic.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+
+      if (magicStr != 'GGUF') {
+        result['error'] = 'Invalid GGUF magic: expected "GGUF", got "$magicStr"';
+        return result;
+      }
+
+      // Read version (4 bytes, little-endian uint32)
+      final versionBytes = await file.read(4);
+      final version = versionBytes[0] | (versionBytes[1] << 8) |
+                      (versionBytes[2] << 16) | (versionBytes[3] << 24);
+      result['ggufVersion'] = version;
+
+      // Read tensor count (8 bytes, little-endian uint64)
+      final tensorCountBytes = await file.read(8);
+      final tensorCount = _readUint64LE(tensorCountBytes);
+      result['tensorCount'] = tensorCount;
+
+      // Read metadata kv count (8 bytes, little-endian uint64)
+      final kvCountBytes = await file.read(8);
+      final kvCount = _readUint64LE(kvCountBytes);
+      result['metadataKvCount'] = kvCount;
+
+      // Try to read architecture from metadata
+      // Metadata format: key (string), value_type (uint32), value
+      // We'll read first few key-value pairs looking for "general.architecture"
+      final metadata = <String, dynamic>{};
+      int kvRead = 0;
+      const maxKvToRead = 20; // Read first 20 kv pairs max
+
+      while (kvRead < kvCount && kvRead < maxKvToRead) {
+        try {
+          // Read key length (8 bytes for GGUF v3)
+          final keyLenBytes = await file.read(8);
+          final keyLen = _readUint64LE(keyLenBytes);
+
+          if (keyLen > 256) {
+            // Sanity check - key shouldn't be too long
+            result['metadataReadError'] = 'Key too long at kv $kvRead: $keyLen';
+            break;
+          }
+
+          // Read key
+          final keyBytes = await file.read(keyLen.toInt());
+          final key = String.fromCharCodes(keyBytes);
+
+          // Read value type (4 bytes)
+          final valueTypeBytes = await file.read(4);
+          final valueType = valueTypeBytes[0] | (valueTypeBytes[1] << 8) |
+                           (valueTypeBytes[2] << 16) | (valueTypeBytes[3] << 24);
+
+          // Read value based on type
+          dynamic value;
+          switch (valueType) {
+            case 8: // GGUF_TYPE_STRING
+              final strLenBytes = await file.read(8);
+              final strLen = _readUint64LE(strLenBytes);
+              if (strLen <= 1024) {
+                final strBytes = await file.read(strLen.toInt());
+                value = String.fromCharCodes(strBytes);
+              } else {
+                // Skip long strings
+                await file.setPosition(await file.position() + strLen.toInt());
+                value = '<string len=$strLen>';
+              }
+              break;
+            case 4: // GGUF_TYPE_UINT32
+              final uint32Bytes = await file.read(4);
+              value = uint32Bytes[0] | (uint32Bytes[1] << 8) |
+                     (uint32Bytes[2] << 16) | (uint32Bytes[3] << 24);
+              break;
+            case 5: // GGUF_TYPE_INT32
+              final int32Bytes = await file.read(4);
+              value = int32Bytes[0] | (int32Bytes[1] << 8) |
+                     (int32Bytes[2] << 16) | (int32Bytes[3] << 24);
+              break;
+            case 6: // GGUF_TYPE_FLOAT32
+              final f32Bytes = await file.read(4);
+              value = '<float32>';
+              break;
+            case 7: // GGUF_TYPE_BOOL
+              final boolBytes = await file.read(1);
+              value = boolBytes[0] != 0;
+              break;
+            default:
+              // For other types, we can't easily skip - break
+              result['metadataReadError'] = 'Unsupported value type $valueType for key "$key"';
+              break;
+          }
+
+          if (result.containsKey('metadataReadError')) break;
+
+          metadata[key] = value;
+          kvRead++;
+
+          // Log important keys
+          if (key == 'general.architecture' ||
+              key == 'general.name' ||
+              key == 'general.quantization_version' ||
+              key.startsWith('llama.') ||
+              key.startsWith('lfm')) {
+            debugPrint('GGUF metadata: $key = $value');
+          }
+        } catch (e) {
+          result['metadataReadError'] = 'Error reading kv $kvRead: $e';
+          break;
+        }
+      }
+
+      result['metadata'] = metadata;
+      result['architecture'] = metadata['general.architecture'] ?? 'unknown';
+      result['modelName'] = metadata['general.name'] ?? 'unknown';
+
+    } catch (e) {
+      result['error'] = 'Failed to read GGUF: $e';
+    } finally {
+      await file?.close();
+    }
+
+    return result;
+  }
+
+  /// Read uint64 from little-endian bytes
+  int _readUint64LE(List<int> bytes) {
+    return bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24) |
+           (bytes[4] << 32) | (bytes[5] << 40) | (bytes[6] << 48) | (bytes[7] << 56);
   }
 }
 
