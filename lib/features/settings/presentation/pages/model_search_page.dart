@@ -41,7 +41,7 @@ class _ModelSearchPageState extends ConsumerState<ModelSearchPage> {
 
   @override
   Widget build(BuildContext context) {
-    final searchState = ref.watch(modelSearchProvider);
+    final ModelSearchState searchState = ref.watch(modelSearchProvider);
     final theme = Theme.of(context);
 
     return Scaffold(

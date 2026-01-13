@@ -55,10 +55,13 @@ class ModelSearchState {
 }
 
 /// Notifier for model search
-class ModelSearchNotifier extends StateNotifier<ModelSearchState> {
-  final HuggingFaceModelSearchService _searchService;
+class ModelSearchNotifier extends Notifier<ModelSearchState> {
+  HuggingFaceModelSearchService get _searchService => ref.read(modelSearchServiceProvider);
 
-  ModelSearchNotifier(this._searchService) : super(const ModelSearchState());
+  @override
+  ModelSearchState build() {
+    return const ModelSearchState();
+  }
 
   /// Search for models
   Future<void> search({String? query, double? maxSizeB}) async {
@@ -96,8 +99,7 @@ class ModelSearchNotifier extends StateNotifier<ModelSearchState> {
 }
 
 /// Provider for model search state
-final modelSearchProvider = StateNotifierProvider<ModelSearchNotifier, ModelSearchState>((ref) {
-  final searchService = ref.watch(modelSearchServiceProvider);
-  return ModelSearchNotifier(searchService);
-});
+final modelSearchProvider = NotifierProvider<ModelSearchNotifier, ModelSearchState>(
+  ModelSearchNotifier.new,
+);
 

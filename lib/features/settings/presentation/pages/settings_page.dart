@@ -122,7 +122,6 @@ class SettingsPage extends ConsumerWidget {
     return FutureBuilder<Map<String, String?>>(
       future: _getSelectedModelInfo(),
       builder: (context, snapshot) {
-        final modelId = snapshot.data?['id'] ?? AppConstants.defaultModelId;
         final modelName = snapshot.data?['name'] ?? 'Default Model';
 
         return ListTile(
