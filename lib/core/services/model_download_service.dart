@@ -174,8 +174,8 @@ class ModelDownloadService {
         return false;
       }
 
-      // Build download URL
-      final downloadUrl = '${AppConstants.modelServerBaseUrl}/$fileName';
+      // Build download URL - use custom URL if provided, otherwise use default server
+      final downloadUrl = modelInfo?.downloadUrl ?? '${AppConstants.modelServerBaseUrl}/$fileName';
 
       // Create a new cancel token for this download
       _cancelToken = CancelToken();

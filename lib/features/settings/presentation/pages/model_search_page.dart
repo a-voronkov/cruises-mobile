@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/huggingface_model_search_service.dart';
-import '../../../../core/services/ai_service_provider.dart';
 import '../providers/model_search_provider.dart';
+import 'model_download_page.dart';
 
 /// Page for searching and selecting AI models from HuggingFace
 class ModelSearchPage extends ConsumerStatefulWidget {
@@ -304,79 +303,14 @@ class _ModelTile extends ConsumerWidget {
     );
   }
 
-  Future<void> _selectModel(BuildContext context, WidgetRef ref) async {
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Model'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Do you want to use this model?'),
-            const SizedBox(height: 16),
-            Text(
-              model.id,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (model.estimatedSizeB != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Size: ~${model.estimatedSizeB!.toStringAsFixed(1)}B parameters',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Select'),
-          ),
-        ],
+  void _selectModel(BuildContext context, WidgetRef ref) {
+    // Navigate to model download page
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ModelDownloadPage(model: model),
       ),
     );
-
-    if (confirmed != true || !context.mounted) return;
-
-    try {
-      // Update AI service with new model
-      final aiService = ref.read(aiServiceProvider);
-      aiService.setModelId(model.id);
-
-      // Save to preferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('selected_model_id', model.id);
-      await prefs.setString('selected_model_name', model.modelName);
-
-      if (!context.mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Model selected: ${model.modelName}'),
-          backgroundColor: Colors.green,
-        ),
-      );
-
-      // Go back to settings
-      Navigator.pop(context);
-    } catch (e) {
-      if (!context.mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
 
   String _formatNumber(int number) {
