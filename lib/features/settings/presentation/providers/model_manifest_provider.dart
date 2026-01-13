@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import '../../../../core/models/model_info.dart';
+import '../../../../core/services/model_download_service.dart';
 import '../../../../core/services/llama_service_provider.dart';
 
 // Re-export modelDownloadServiceProvider from llama_service_provider
