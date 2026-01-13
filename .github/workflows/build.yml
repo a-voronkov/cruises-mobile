@@ -15,10 +15,11 @@ name: Build and Release
 # - Conditional build: only runs when commit message contains "build"
 # - Separate setup job for dependencies (cached intelligently)
 # - Parallel Android/iOS builds after setup
-# - Caches: Flutter SDK, Pub, Gradle, CocoaPods, llama.cpp, generated code
+# - Caches: Flutter SDK, Pub, Gradle, CocoaPods, generated code
 # - Cache invalidation: automatic based on lock files and version files
 # - Saves ~90% time on subsequent builds
 # - Creates GitHub release with APK, AAB, and iOS build
+# - Injects HuggingFace API token for AI features
 
 env:
   FLUTTER_VERSION: '3.38.6'
@@ -26,6 +27,7 @@ env:
   GRADLE_VERSION: '8.2.1'
   ANDROID_NDK_VERSION: '25.1.8937393'
   LANG: en_US.UTF-8
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
 
 on:
   push:
@@ -360,98 +362,9 @@ jobs:
           echo "✅ Android resources verified"
           ls -la android/app/src/main/res/
 
-      - name: Ensure CMake available (required by llama.cpp build scripts)
-        run: |
-          if command -v cmake >/dev/null 2>&1; then
-            echo "✅ CMake already available: $(cmake --version | head -n 1)"
-            exit 0
-          fi
-
-          echo "CMake not found; installing via Android SDK..."
-          sdkmanager --install "cmake;3.22.1"
-          yes | sdkmanager --licenses > /dev/null
-
-          CMAKE_BIN_DIR="$ANDROID_SDK_ROOT/cmake/3.22.1/bin"
-          "$CMAKE_BIN_DIR/cmake" --version
-          echo "$CMAKE_BIN_DIR" >> $GITHUB_PATH
-
-      # Build (or reuse local runner cache) llama.cpp for Android
-      - name: Ensure llama.cpp Android library
-        run: |
-          chmod +x scripts/build-llama-android.sh
-          bash scripts/build-llama-android.sh
-
-        # NOTE: Do not override ANDROID_NDK_HOME here.
-        # On self-hosted runners it's usually configured as a machine-level env var,
-        # and setting it via `${{ env.ANDROID_NDK_HOME }}` can unintentionally blank it.
-
-      # Verify llama.cpp libraries exist (libllama.so + libggml.so required)
-      - name: Verify llama.cpp libraries
-        run: |
-          JNILIBS_DIR="android/app/src/main/jniLibs/arm64-v8a"
-
-          if [ ! -f "$JNILIBS_DIR/libllama.so" ]; then
-            echo "❌ Error: libllama.so not found!"
-            exit 1
-          fi
-
-          if [ ! -f "$JNILIBS_DIR/libggml.so" ]; then
-            echo "❌ Error: libggml.so not found!"
-            echo "This library is required by libllama.so at runtime."
-            exit 1
-          fi
-
-          echo "✅ llama.cpp libraries found:"
-          ls -lh "$JNILIBS_DIR"/*.so
-
       # Get dependencies (should be fast due to cache)
       - name: Get dependencies
         run: flutter pub get
-
-      # The llama_cpp_dart package from pub.dev does NOT include the llama.cpp submodule.
-      # We need to clone it into the pub-cache directory for the native CMake build to work.
-      # CMakeLists.txt is in src/ directory, so llama.cpp must be at src/llama.cpp
-      - name: Clone llama.cpp into llama_cpp_dart package
-        run: |
-          # Read version from our version file
-          LLAMA_VERSION=$(grep -v '^[[:space:]]*#' scripts/llama-version.txt | grep -v '^[[:space:]]*$' | head -n 1)
-          echo "llama.cpp version: $LLAMA_VERSION"
-
-          # Find the llama_cpp_dart package directory
-          PUB_CACHE="${PUB_CACHE:-$HOME/.pub-cache}"
-          LLAMA_PKG_DIR=$(find "$PUB_CACHE/hosted" -maxdepth 2 -type d -name "llama_cpp_dart-*" | head -n 1)
-
-          if [ -z "$LLAMA_PKG_DIR" ]; then
-            echo "❌ Error: llama_cpp_dart package not found in pub cache"
-            exit 1
-          fi
-          echo "Found llama_cpp_dart at: $LLAMA_PKG_DIR"
-
-          # Clone llama.cpp into the src subdirectory of the package
-          # (CMakeLists.txt is in src/ and references ./llama.cpp relative to itself)
-          LLAMA_CPP_DIR="$LLAMA_PKG_DIR/src/llama.cpp"
-          if [ ! -d "$LLAMA_CPP_DIR" ]; then
-            echo "Cloning llama.cpp into $LLAMA_CPP_DIR..."
-            git clone --depth 1 --branch "$LLAMA_VERSION" https://github.com/ggml-org/llama.cpp "$LLAMA_CPP_DIR" || \
-            git clone https://github.com/ggml-org/llama.cpp "$LLAMA_CPP_DIR"
-
-            if [ -d "$LLAMA_CPP_DIR" ]; then
-              cd "$LLAMA_CPP_DIR"
-              git fetch --tags origin
-              git checkout "$LLAMA_VERSION" || echo "Warning: Could not checkout $LLAMA_VERSION, using default branch"
-            fi
-          else
-            echo "✅ llama.cpp already exists at $LLAMA_CPP_DIR"
-          fi
-
-          # Verify
-          if [ -d "$LLAMA_CPP_DIR" ]; then
-            echo "✅ llama.cpp cloned successfully"
-            ls -la "$LLAMA_CPP_DIR" | head -10
-          else
-            echo "❌ Error: Failed to clone llama.cpp"
-            exit 1
-          fi
 
       # Build APK
       - name: Build APK
@@ -611,7 +524,7 @@ jobs:
             ### 🔧 Built with
             - Flutter ${{ env.FLUTTER_VERSION }}
             - Java ${{ env.JAVA_VERSION }}
-            - llama.cpp (version: see `scripts/llama-version.txt`)
+            - HuggingFace Inference API
 
             ### ⏱️ Build Information
             - Workflow Run: #${{ github.run_number }}
