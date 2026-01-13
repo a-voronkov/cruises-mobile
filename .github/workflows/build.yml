@@ -88,9 +88,7 @@ jobs:
           if [ ! -d "$HOME/flutter/.git" ]; then
             git clone https://github.com/flutter/flutter.git -b stable $HOME/flutter
           fi
-          cd $HOME/flutter
-          git fetch --tags
-          git checkout ${{ env.FLUTTER_VERSION }}
+          (cd $HOME/flutter && git fetch --tags && git checkout ${{ env.FLUTTER_VERSION }})
 
       # Add Flutter to PATH
       - name: Add Flutter to PATH
