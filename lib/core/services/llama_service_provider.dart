@@ -2,22 +2,30 @@ import 'package:bugsnag_flutter/bugsnag_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'llama_service.dart';
+import 'model_download_service.dart';
 
 /// Provider for LlamaService singleton
 final llamaServiceProvider = Provider<LlamaService>((ref) {
   final service = LlamaService();
-  
+
   // Dispose when provider is disposed
   ref.onDispose(() {
     service.dispose();
   });
-  
+
   return service;
+});
+
+/// Provider for ModelDownloadService singleton (shared with settings)
+final modelDownloadServiceProvider = Provider<ModelDownloadService>((ref) {
+  return ModelDownloadService();
 });
 
 /// Provider for model initialization state
 final modelInitializationProvider = StateNotifierProvider<ModelInitializationNotifier, ModelInitializationState>((ref) {
-  return ModelInitializationNotifier(ref.read(llamaServiceProvider));
+  final llamaService = ref.read(llamaServiceProvider);
+  final downloadService = ref.read(modelDownloadServiceProvider);
+  return ModelInitializationNotifier(llamaService, downloadService);
 });
 
 /// State for model initialization
@@ -52,8 +60,10 @@ class ModelInitializationState {
 /// Notifier for managing model initialization
 class ModelInitializationNotifier extends StateNotifier<ModelInitializationState> {
   final LlamaService _llamaService;
+  final ModelDownloadService _downloadService;
 
-  ModelInitializationNotifier(this._llamaService) : super(const ModelInitializationState());
+  ModelInitializationNotifier(this._llamaService, this._downloadService)
+      : super(const ModelInitializationState());
 
   /// Initialize the model
   Future<void> initialize() async {
@@ -64,7 +74,11 @@ class ModelInitializationNotifier extends StateNotifier<ModelInitializationState
     state = state.copyWith(isLoading: true, error: null, progress: 0.0);
 
     try {
+      // Use the currently selected model filename
+      final modelFileName = _downloadService.currentModelFileName;
+
       final success = await _llamaService.initialize(
+        modelFileName: modelFileName,
         onProgress: (progress) {
           state = state.copyWith(progress: progress);
         },

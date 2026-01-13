@@ -5,6 +5,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/services/model_download_service.dart';
 import '../../../../main.dart';
 import '../providers/settings_provider.dart';
+import 'model_selection_page.dart';
 
 /// Provider for app version info
 final packageInfoProvider = FutureProvider<PackageInfo>((ref) async {
@@ -35,6 +36,7 @@ class SettingsPage extends ConsumerWidget {
                 // Model section
                 _buildSectionHeader(context, 'AI Model'),
                 _buildModelInfoTile(context),
+                _buildManageModelsTile(context),
                 _buildRedownloadModelTile(context, ref),
                 _buildDeleteModelTile(context, ref),
                 const Divider(),
@@ -130,6 +132,21 @@ class SettingsPage extends ConsumerWidget {
           trailing: snapshot.hasData && snapshot.data != null
               ? Icon(Icons.check_circle, color: Colors.green[600])
               : Icon(Icons.warning_amber, color: Colors.orange[600]),
+        );
+      },
+    );
+  }
+
+  Widget _buildManageModelsTile(BuildContext context) {
+    return ListTile(
+      leading: const Icon(Icons.model_training_outlined),
+      title: const Text('Manage AI models'),
+      subtitle: const Text('Download or switch between models'),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ModelSelectionPage()),
         );
       },
     );
