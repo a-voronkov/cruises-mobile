@@ -5,16 +5,18 @@ import 'package:http/http.dart' as http;
 /// Information about a model file on HuggingFace
 class HFModelFile {
   final String path;
-  final int size;
+  int size; // Mutable to allow updating after fetching real size
   final String? oid; // Git LFS object ID
   final String type; // 'file' or 'directory'
+  final List<HFModelFile> relatedFiles; // For _data files
 
   HFModelFile({
     required this.path,
     required this.size,
     this.oid,
     required this.type,
-  });
+    List<HFModelFile>? relatedFiles,
+  }) : relatedFiles = relatedFiles ?? [];
 
   factory HFModelFile.fromJson(Map<String, dynamic> json) {
     return HFModelFile(
@@ -23,6 +25,15 @@ class HFModelFile {
       oid: json['oid'] as String?,
       type: json['type'] as String? ?? 'file',
     );
+  }
+
+  /// Get total size including related files
+  int get totalSize {
+    int total = size;
+    for (final related in relatedFiles) {
+      total += related.size;
+    }
+    return total;
   }
 
   /// Get quantization type from filename (e.g., "int8", "fp16", "q4")
@@ -60,7 +71,10 @@ class HFModelFile {
 
   /// Format size in human readable format
   String get formattedSize {
-    final mb = size / (1024 * 1024);
+    final bytes = totalSize;
+    if (bytes == 0) return 'Unknown size';
+
+    final mb = bytes / (1024 * 1024);
     if (mb >= 1024) {
       return '${(mb / 1024).toStringAsFixed(2)} GB';
     }
@@ -159,16 +173,40 @@ class HuggingFaceModelFilesService {
 
   /// Get ONNX files grouped by quantization
   ///
-  /// Groups main .onnx files with their _data files
+  /// Groups main .onnx files with their _data files and fetches real sizes
   Future<Map<String, List<HFModelFile>>> getONNXFilesByQuantization(String repoId) async {
     final allFiles = await getModelFiles(repoId: repoId, fileType: 'onnx');
 
-    // Filter to only main .onnx files (not _data files)
-    final mainFiles = allFiles.where((file) {
-      final fileName = file.path.toLowerCase();
-      return fileName.endsWith('.onnx') && !fileName.contains('_data');
-    }).toList();
+    // Separate main files and data files
+    final mainFiles = <HFModelFile>[];
+    final dataFiles = <String, List<HFModelFile>>{};
 
+    for (final file in allFiles) {
+      final fileName = file.path.toLowerCase();
+      if (fileName.endsWith('.onnx') && !fileName.contains('_data')) {
+        mainFiles.add(file);
+      } else if (fileName.contains('_data')) {
+        // Extract base name (e.g., "model_q4.onnx" from "model_q4.onnx_data")
+        final baseName = file.path.replaceAll(RegExp(r'_data(_\d+)?$'), '');
+        dataFiles.putIfAbsent(baseName, () => []).add(file);
+      }
+    }
+
+    // Attach related files and fetch real sizes
+    for (final mainFile in mainFiles) {
+      final related = dataFiles[mainFile.path] ?? [];
+      mainFile.relatedFiles.addAll(related);
+
+      // Fetch real size for main file
+      await _fetchRealSize(repoId, mainFile);
+
+      // Fetch real sizes for related files
+      for (final relatedFile in related) {
+        await _fetchRealSize(repoId, relatedFile);
+      }
+    }
+
+    // Group by quantization
     final grouped = <String, List<HFModelFile>>{};
     for (final file in mainFiles) {
       final quant = file.quantization ?? 'Unknown';
@@ -188,6 +226,30 @@ class HuggingFaceModelFilesService {
       });
 
     return Map.fromEntries(sortedEntries);
+  }
+
+  /// Fetch real file size using HEAD request
+  Future<void> _fetchRealSize(String repoId, HFModelFile file) async {
+    try {
+      final url = file.getDownloadUrl(repoId);
+      final uri = Uri.parse(url);
+
+      final headers = <String, String>{
+        if (_apiKey != null) 'Authorization': 'Bearer $_apiKey',
+      };
+
+      final response = await _client.head(uri, headers: headers);
+
+      if (response.statusCode == 200 || response.statusCode == 302) {
+        final contentLength = response.headers['content-length'];
+        if (contentLength != null) {
+          file.size = int.tryParse(contentLength) ?? file.size;
+          debugPrint('Fetched size for ${file.path}: ${file.formattedSize}');
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch size for ${file.path}: $e');
+    }
   }
 
   void dispose() {

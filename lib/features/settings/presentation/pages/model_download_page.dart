@@ -256,55 +256,70 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
     try {
       final downloadService = ref.read(modelDownloadServiceProvider);
 
-      // Create ModelInfo from HFModelFile
-      final modelInfo = ModelInfo(
-        id: widget.model.id,
-        name: widget.model.modelName,
-        description: widget.model.description ?? '',
-        fileName: file.path.split('/').last,
-        sizeBytes: file.size,
-        architecture: widget.model.modelName,
-        quantization: file.quantization ?? 'Unknown',
-        contextLength: 4096,
-        huggingFaceRepo: widget.model.id,
-        format: ModelFormat.onnx,
-        downloadUrl: file.getDownloadUrl(widget.model.id),
-      );
+      // Calculate total files to download (main + related)
+      final totalFiles = 1 + file.relatedFiles.length;
+      final allFiles = [file, ...file.relatedFiles];
 
-      final success = await downloadService.downloadModel(
-        modelInfo: modelInfo,
-        onProgress: (progress, status) {
-          setState(() {
-            _downloadProgress = progress;
-            _downloadStatus = status;
-          });
-        },
-      );
+      setState(() {
+        _downloadStatus = 'Downloading $totalFiles file${totalFiles > 1 ? 's' : ''}...';
+      });
+
+      // Download all files
+      for (int i = 0; i < allFiles.length; i++) {
+        final currentFile = allFiles[i];
+        final fileName = currentFile.path.split('/').last;
+
+        setState(() {
+          _downloadStatus = 'Downloading ${i + 1}/$totalFiles: $fileName';
+        });
+
+        // Create ModelInfo for this file
+        final modelInfo = ModelInfo(
+          id: widget.model.id,
+          name: widget.model.modelName,
+          description: widget.model.description ?? '',
+          fileName: fileName,
+          sizeBytes: currentFile.size,
+          architecture: widget.model.modelName,
+          quantization: file.quantization ?? 'Unknown',
+          contextLength: 4096,
+          huggingFaceRepo: widget.model.id,
+          format: ModelFormat.onnx,
+          downloadUrl: currentFile.getDownloadUrl(widget.model.id),
+        );
+
+        final success = await downloadService.downloadModel(
+          modelInfo: modelInfo,
+          onProgress: (progress, status) {
+            // Calculate overall progress
+            final fileProgress = (i + progress) / totalFiles;
+            setState(() {
+              _downloadProgress = fileProgress;
+              _downloadStatus = 'File ${i + 1}/$totalFiles: $status';
+            });
+          },
+        );
+
+        if (!success) {
+          throw Exception('Failed to download $fileName');
+        }
+      }
 
       if (!mounted) return;
 
-      if (success) {
-        // Update AI service with new model
-        final aiService = ref.read(aiServiceProvider);
-        aiService.setModelId(widget.model.id);
+      // Update AI service with new model
+      final aiService = ref.read(aiServiceProvider);
+      aiService.setModelId(widget.model.id);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Model downloaded successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Model downloaded successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
 
-        // Go back to settings
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Download failed: $_downloadStatus'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      // Go back to settings
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
 
@@ -452,6 +467,7 @@ class _FileListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final fileName = file.path.split('/').last;
+    final hasRelatedFiles = file.relatedFiles.isNotEmpty;
 
     return ListTile(
       title: Text(
@@ -463,15 +479,20 @@ class _FileListTile extends StatelessWidget {
         children: [
           Text(
             file.formattedSize,
-            style: theme.textTheme.bodySmall,
-          ),
-          Text(
-            'Note: May include additional _data files',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontSize: 11,
+              fontWeight: FontWeight.w600,
             ),
           ),
+          if (hasRelatedFiles) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Includes ${file.relatedFiles.length} data file${file.relatedFiles.length > 1 ? 's' : ''}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 11,
+              ),
+            ),
+          ],
         ],
       ),
       trailing: FilledButton.icon(
