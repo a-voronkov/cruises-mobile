@@ -445,8 +445,18 @@ jobs:
       - name: Install CocoaPods
         run: |
           if ! command -v pod &> /dev/null; then
-            echo "CocoaPods not found, installing..."
-            sudo gem install cocoapods
+            echo "CocoaPods not found, installing via Homebrew..."
+            # Try Homebrew first (preferred method for self-hosted runners)
+            if command -v brew &> /dev/null; then
+              brew install cocoapods
+            else
+              # Fallback to gem install without sudo (installs to user directory)
+              echo "Homebrew not found, installing via gem (user install)..."
+              gem install cocoapods --user-install
+              # Add user gem bin to PATH
+              export PATH="$HOME/.gem/ruby/$(ruby -e 'puts RUBY_VERSION')/bin:$PATH"
+              echo "$HOME/.gem/ruby/$(ruby -e 'puts RUBY_VERSION')/bin" >> $GITHUB_PATH
+            fi
           else
             echo "CocoaPods already installed: $(pod --version)"
           fi
