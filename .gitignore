@@ -125,9 +125,9 @@ build/llama.cpp/
 ios/Frameworks/llama.xcframework/
 android/app/src/main/jniLibs/*/libllama.so
 
-# Code generation (committed for CI compatibility)
-# *.g.dart
-# *.freezed.dart
+# Code generation (generated on CI by build_runner)
+*.g.dart
+*.freezed.dart
 *.config.dart
 
 # Environment files
