@@ -441,6 +441,43 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      # Ensure iOS project files exist
+      - name: Ensure iOS project exists
+        run: |
+          # Check if Podfile exists
+          if [ ! -f "ios/Podfile" ]; then
+            echo "⚠️  iOS project files missing (Podfile not found). Regenerating via flutter create..."
+
+            PROJECT_NAME="$(awk -F': *' '/^name:/{print $2; exit}' pubspec.yaml)"
+            if [ -z "$PROJECT_NAME" ]; then
+              PROJECT_NAME="cruises_mobile"
+            fi
+
+            # Preserve existing Info.plist if it exists
+            if [ -f "ios/Runner/Info.plist" ]; then
+              cp "ios/Runner/Info.plist" "$RUNNER_TEMP/Info.plist.bak"
+            fi
+
+            # Generate iOS project files
+            flutter create --platforms=ios --project-name "$PROJECT_NAME" . || true
+
+            # Restore preserved Info.plist if it was backed up
+            if [ -f "$RUNNER_TEMP/Info.plist.bak" ]; then
+              cp "$RUNNER_TEMP/Info.plist.bak" "ios/Runner/Info.plist"
+              echo "✅ Restored ios/Runner/Info.plist"
+            fi
+
+            echo "✅ iOS project files generated"
+          fi
+
+          # Verify Podfile exists
+          if [ ! -f "ios/Podfile" ]; then
+            echo "❌ Podfile still missing after flutter create"
+            ls -la ios/ || true
+            exit 1
+          fi
+          echo "✅ iOS Podfile verified"
+
       # Install CocoaPods (if not already installed)
       - name: Install CocoaPods
         run: |
