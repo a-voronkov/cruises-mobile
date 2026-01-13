@@ -1,7 +1,7 @@
 name: cruises_mobile
 description: An autonomous travel planning assistant with embedded LLM for mobile platforms.
 publish_to: 'none'
-version: 0.0.13+32
+version: 0.0.13+33
 
 environment:
   sdk: '>=3.7.0 <4.0.0'
@@ -45,9 +45,12 @@ dependencies:
   # Error Tracking
   bugsnag_flutter: ^4.2.0
 
-  # LLM Integration - llama.cpp for on-device inference
-  # llama_cpp_dart 0.2.x uses llama.cpp 4ffc47cb (Dec 2025) with LFM2/LFM2.5 support
-  llama_cpp_dart: ^0.2.2
+  # LLM Integration - ONNX Runtime for cross-platform on-device inference
+  # FONNX provides ONNX Runtime bindings for Flutter with platform acceleration
+  fonnx: ^0.2.0
+
+  # HTTP client for HuggingFace API
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:
