@@ -1,3 +1,5 @@
+import 'package:bugsnag_flutter/bugsnag_flutter.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/model_info.dart';
@@ -20,25 +22,83 @@ class _ModelSetupPageState extends ConsumerState<ModelSetupPage> {
   Future<void> _initializeAndGoToChat() async {
     if (_isInitializingModel) return;
 
+    debugPrint('=== ModelSetupPage: Starting initialization ===');
+
     setState(() {
       _isInitializingModel = true;
     });
 
-    // Cloud-based AI service is always ready, no initialization needed
-    await Future.delayed(const Duration(milliseconds: 500)); // Brief delay for UX
+    try {
+      // Check if AI service is initialized
+      final aiServiceState = ref.read(aiServiceStateProvider);
+      debugPrint('AI Service state - isReady: ${aiServiceState.isReady}, error: ${aiServiceState.error}');
 
-    if (!mounted) return;
+      if (!aiServiceState.isReady) {
+        debugPrint('❌ AI Service not ready, showing error');
+        if (!mounted) return;
 
-    setState(() {
-      _isInitializingModel = false;
-    });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(aiServiceState.error ?? 'AI service not ready'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
 
-    // Invalidate model status to trigger navigation.
-    ref.invalidate(modelStatusProvider);
+        await bugsnag.notify(
+          Exception('AI Service not ready when trying to navigate to chat'),
+          (event) {
+            event.context = 'Model Setup Page';
+            event.addMetadata('aiService', {
+              'isReady': aiServiceState.isReady,
+              'error': aiServiceState.error,
+            });
+          },
+        );
 
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => const ChatPage()),
-    );
+        setState(() {
+          _isInitializingModel = false;
+        });
+        return;
+      }
+
+      // Brief delay for UX
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (!mounted) return;
+
+      debugPrint('✅ Navigating to chat page');
+
+      // Invalidate model status to trigger navigation
+      ref.invalidate(modelStatusProvider);
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(builder: (_) => const ChatPage()),
+      );
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error in _initializeAndGoToChat: $e');
+      debugPrint('Stack trace: $stackTrace');
+
+      await bugsnag.notify(
+        e,
+        (event) {
+          event.context = 'Model Setup Page - Initialize and Go to Chat';
+        },
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+
+      setState(() {
+        _isInitializingModel = false;
+      });
+    }
   }
 
   Future<void> _downloadAndContinue(ModelInfo model) async {

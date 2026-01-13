@@ -1,3 +1,4 @@
+import 'package:bugsnag_flutter/bugsnag_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'ai_service.dart';
@@ -16,25 +17,68 @@ final modelDownloadServiceProvider = Provider<ModelDownloadService>((ref) {
 
 /// Provider that initializes AI service on app start
 final aiServiceInitializerProvider = FutureProvider<bool>((ref) async {
-  final aiService = ref.read(aiServiceProvider);
+  try {
+    final aiService = ref.read(aiServiceProvider);
 
-  if (!ApiConfig.isConfigured) {
-    debugPrint('AIService: HF_TOKEN not configured');
+    debugPrint('=== AI Service Initialization ===');
+    debugPrint('ApiConfig.isConfigured: ${ApiConfig.isConfigured}');
+    debugPrint('ApiConfig.huggingFaceApiKey length: ${ApiConfig.huggingFaceApiKey.length}');
+    debugPrint('ApiConfig.huggingFaceApiKey (first 10 chars): ${ApiConfig.huggingFaceApiKey.isEmpty ? "EMPTY" : ApiConfig.huggingFaceApiKey.substring(0, ApiConfig.huggingFaceApiKey.length > 10 ? 10 : ApiConfig.huggingFaceApiKey.length)}...');
+
+    if (!ApiConfig.isConfigured) {
+      final error = 'HF_TOKEN not configured - API key is empty';
+      debugPrint('ERROR: $error');
+      await bugsnag.notify(
+        Exception(error),
+        (event) {
+          event.context = 'AI Service Initialization';
+          event.addMetadata('config', {
+            'isConfigured': ApiConfig.isConfigured,
+            'keyLength': ApiConfig.huggingFaceApiKey.length,
+          });
+        },
+      );
+      return false;
+    }
+
+    debugPrint('Initializing AIService with API key...');
+    final success = await aiService.initialize(
+      apiKey: ApiConfig.huggingFaceApiKey,
+    );
+
+    if (success) {
+      debugPrint('✅ AIService initialized successfully');
+    } else {
+      final error = 'AIService initialization returned false';
+      debugPrint('❌ $error');
+      await bugsnag.notify(
+        Exception(error),
+        (event) {
+          event.context = 'AI Service Initialization';
+          event.addMetadata('config', {
+            'isConfigured': ApiConfig.isConfigured,
+            'keyLength': ApiConfig.huggingFaceApiKey.length,
+          });
+        },
+      );
+    }
+
+    return success;
+  } catch (e, stackTrace) {
+    debugPrint('❌ Exception during AI service initialization: $e');
+    debugPrint('Stack trace: $stackTrace');
+    await bugsnag.notify(
+      e,
+      (event) {
+        event.context = 'AI Service Initialization';
+        event.addMetadata('config', {
+          'isConfigured': ApiConfig.isConfigured,
+          'keyLength': ApiConfig.huggingFaceApiKey.length,
+        });
+      },
+    );
     return false;
   }
-
-  debugPrint('AIService: Initializing with API key...');
-  final success = await aiService.initialize(
-    apiKey: ApiConfig.huggingFaceApiKey,
-  );
-
-  if (success) {
-    debugPrint('AIService: Initialized successfully');
-  } else {
-    debugPrint('AIService: Initialization failed');
-  }
-
-  return success;
 });
 
 /// Provider for AI service state
