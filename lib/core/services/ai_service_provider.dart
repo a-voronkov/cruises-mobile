@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'ai_service.dart';
 import 'model_download_service.dart';
+import '../config/api_config.dart';
 
 /// Provider for AIService singleton
 final aiServiceProvider = Provider<AIService>((ref) {
@@ -12,9 +14,44 @@ final modelDownloadServiceProvider = Provider<ModelDownloadService>((ref) {
   return ModelDownloadService();
 });
 
+/// Provider that initializes AI service on app start
+final aiServiceInitializerProvider = FutureProvider<bool>((ref) async {
+  final aiService = ref.read(aiServiceProvider);
+
+  if (!ApiConfig.isConfigured) {
+    debugPrint('AIService: HF_TOKEN not configured');
+    return false;
+  }
+
+  debugPrint('AIService: Initializing with API key...');
+  final success = await aiService.initialize(
+    apiKey: ApiConfig.huggingFaceApiKey,
+  );
+
+  if (success) {
+    debugPrint('AIService: Initialized successfully');
+  } else {
+    debugPrint('AIService: Initialization failed');
+  }
+
+  return success;
+});
+
 /// Provider for AI service state
 final aiServiceStateProvider = Provider<AIServiceState>((ref) {
-  return const AIServiceState();
+  final initState = ref.watch(aiServiceInitializerProvider);
+
+  return initState.when(
+    data: (success) => AIServiceState(
+      isReady: success,
+      error: success ? null : 'Failed to initialize AI service. Please check your API key.',
+    ),
+    loading: () => const AIServiceState(isReady: false),
+    error: (error, _) => AIServiceState(
+      isReady: false,
+      error: 'Failed to initialize: $error',
+    ),
+  );
 });
 
 /// State for AI service

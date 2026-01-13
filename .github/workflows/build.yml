@@ -378,7 +378,7 @@ jobs:
           echo "ANDROID_USER_HOME=$ANDROID_USER_HOME"
           echo "ANDROID_SDK_HOME is unset"
           java -version
-          flutter build apk --release --verbose
+          flutter build apk --release --verbose --dart-define=HF_TOKEN=${{ env.HF_TOKEN }}
 
       # Build App Bundle
       - name: Build App Bundle
@@ -389,7 +389,7 @@ jobs:
           unset ANDROID_SDK_HOME
           echo "JAVA_HOME(used)=$JAVA_HOME"
           java -version
-          flutter build appbundle --release --verbose
+          flutter build appbundle --release --verbose --dart-define=HF_TOKEN=${{ env.HF_TOKEN }}
 
       # Upload APK artifact
       - name: Upload APK artifact
@@ -507,7 +507,7 @@ jobs:
       # Build iOS app (no code signing for now)
       - name: Build iOS app
         run: |
-          flutter build ios --release --no-codesign
+          flutter build ios --release --no-codesign --dart-define=HF_TOKEN=${{ env.HF_TOKEN }}
 
       # Package iOS app as zip for easy download
       - name: Package iOS app

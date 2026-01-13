@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'core/di/injection.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/hive_service.dart';
+import 'core/services/ai_service_provider.dart';
+import 'core/config/api_config.dart';
 import 'core/providers/model_status_provider.dart';
 import 'features/chat/presentation/pages/chat_page.dart';
 import 'features/model_management/presentation/pages/model_setup_page.dart';
@@ -23,8 +25,12 @@ Future<void> main() async {
   await configureDependencies();
 
   runApp(
-    const ProviderScope(
-      child: CruisesApp(),
+    ProviderScope(
+      overrides: [
+        // Initialize AI service with API key
+        aiServiceInitializerProvider,
+      ],
+      child: const CruisesApp(),
     ),
   );
 }
