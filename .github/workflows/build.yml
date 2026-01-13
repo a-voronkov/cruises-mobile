@@ -441,6 +441,16 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      # Install CocoaPods (if not already installed)
+      - name: Install CocoaPods
+        run: |
+          if ! command -v pod &> /dev/null; then
+            echo "CocoaPods not found, installing..."
+            sudo gem install cocoapods
+          else
+            echo "CocoaPods already installed: $(pod --version)"
+          fi
+
       # Install CocoaPods dependencies
       - name: Install CocoaPods dependencies
         run: |
