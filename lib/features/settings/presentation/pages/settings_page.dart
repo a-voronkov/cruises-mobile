@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/model_status_provider.dart';
 import '../../../../core/services/ai_service_provider.dart' show modelDownloadServiceProvider;
 import '../../../../main.dart';
 import '../providers/settings_provider.dart';
-import 'model_selection_page.dart';
+import 'model_search_page.dart';
 
 /// Provider for app version info
 final packageInfoProvider = FutureProvider<PackageInfo>((ref) async {
@@ -118,41 +119,40 @@ class SettingsPage extends ConsumerWidget {
   }
 
   Widget _buildModelInfoTile(BuildContext context, WidgetRef ref) {
-    final downloadService = ref.watch(modelDownloadServiceProvider);
-    final selectedModel = downloadService.selectedModel;
-    final modelName = selectedModel?.name ?? AppConstants.modelName;
-
-    return FutureBuilder<int?>(
-      future: downloadService.getModelSize(),
+    return FutureBuilder<Map<String, String?>>(
+      future: _getSelectedModelInfo(),
       builder: (context, snapshot) {
-        String sizeText = '';
-        if (snapshot.hasData && snapshot.data != null) {
-          final sizeMB = (snapshot.data! / (1024 * 1024)).toStringAsFixed(0);
-          sizeText = ' • $sizeMB MB';
-        }
+        final modelId = snapshot.data?['id'] ?? AppConstants.defaultModelId;
+        final modelName = snapshot.data?['name'] ?? 'Default Model';
 
         return ListTile(
           leading: const Icon(Icons.smart_toy_outlined),
           title: const Text('Current model'),
-          subtitle: Text('$modelName$sizeText'),
-          trailing: snapshot.hasData && snapshot.data != null
-              ? Icon(Icons.check_circle, color: Colors.green[600])
-              : Icon(Icons.warning_amber, color: Colors.orange[600]),
+          subtitle: Text(modelName),
+          trailing: Icon(Icons.check_circle, color: Colors.green[600]),
         );
       },
     );
+  }
+
+  Future<Map<String, String?>> _getSelectedModelInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    return {
+      'id': prefs.getString('selected_model_id'),
+      'name': prefs.getString('selected_model_name'),
+    };
   }
 
   Widget _buildManageModelsTile(BuildContext context) {
     return ListTile(
       leading: const Icon(Icons.model_training_outlined),
       title: const Text('Manage AI models'),
-      subtitle: const Text('Download or switch between models'),
+      subtitle: const Text('Search and select models from HuggingFace'),
       trailing: const Icon(Icons.chevron_right),
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const ModelSelectionPage()),
+          MaterialPageRoute(builder: (_) => const ModelSearchPage()),
         );
       },
     );

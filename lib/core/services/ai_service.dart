@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'huggingface_inference_service.dart';
 import '../constants/app_constants.dart';
 
@@ -20,6 +21,14 @@ class AIService {
 
   /// Get the current model ID
   String? get modelId => _currentModelId;
+
+  /// Set the model ID to use for generation
+  ///
+  /// This allows changing the model without reinitializing the service
+  void setModelId(String modelId) {
+    _currentModelId = modelId;
+    debugPrint('AIService: Model changed to: $modelId');
+  }
 
   /// Initialize the AI service
   /// 
@@ -54,7 +63,14 @@ class AIService {
 
       // Initialize HuggingFace service
       _hfService = HuggingFaceInferenceService(apiKey: apiKey);
-      _currentModelId = modelId ?? AppConstants.defaultModelId;
+
+      // Load saved model ID or use provided/default
+      if (modelId != null) {
+        _currentModelId = modelId;
+      } else {
+        final prefs = await SharedPreferences.getInstance();
+        _currentModelId = prefs.getString('selected_model_id') ?? AppConstants.defaultModelId;
+      }
 
       onProgress?.call(0.7);
 
