@@ -127,12 +127,20 @@ class LlamaService {
       final libraryPath = await _getLibraryPath();
       diagnostics['libraryPath'] = libraryPath ?? 'default (embedded)';
 
+      debugPrint('LlamaService: Platform: ${Platform.operatingSystem}');
+      debugPrint('LlamaService: Library path: ${libraryPath ?? "default (embedded)"}');
+
       if (libraryPath != null) {
+        debugPrint('LlamaService: Setting Llama.libraryPath = $libraryPath');
         Llama.libraryPath = libraryPath;
+        debugPrint('LlamaService: Library path set successfully');
+      } else {
+        debugPrint('LlamaService: Using default library discovery (embedded)');
       }
 
       onProgress?.call(0.5);
       diagnostics['initStage'] = 'pre_llama_init';
+      debugPrint('LlamaService: About to initialize LlamaParent...');
 
 	  // llama_cpp_dart's params are configured via mutable properties (not
 	  // constructor named-args). Keep this compatible with older versions.
@@ -198,8 +206,15 @@ class LlamaService {
 	      onProgress?.call(attemptIndex == 0 ? 0.7 : 0.75);
 
 	      // Initialize LlamaParent (runs in isolate for non-blocking)
+	      debugPrint('LlamaService: Creating LlamaParent with model: $_modelPath');
+	      debugPrint('LlamaService: ModelParams - nGpuLayers: 0, useMemorymap: $useMemorymap');
+	      debugPrint('LlamaService: ContextParams - nCtx: ${AppConstants.contextLength}, nThreads: ${AppConstants.numThreads}');
+
 	      _llamaParent = LlamaParent(loadCommand);
+
+	      debugPrint('LlamaService: Calling LlamaParent.init() - this will load native libraries via FFI');
 	      await _llamaParent!.init();
+	      debugPrint('LlamaService: LlamaParent.init() completed successfully!');
 
 	      diagnostics['useMemorymap'] = useMemorymap;
 
@@ -207,6 +222,8 @@ class LlamaService {
 	      _updateGlobalMetadata(diagnostics, 'initialized');
 	      break;
 	    } catch (e, st) {
+	      debugPrint('LlamaService: LlamaParent.init() failed on attempt $attemptIndex: $e');
+	      debugPrint('LlamaService: Stack trace: $st');
 	      diagnostics['llamaInitError_attempt_$attemptIndex'] = e.toString();
 
 	      // Update global metadata on error
@@ -460,18 +477,26 @@ class LlamaService {
 
   /// Get the platform-specific llama.cpp library path
   Future<String?> _getLibraryPath() async {
+    debugPrint('LlamaService: _getLibraryPath() called');
+
     // llama_cpp_dart defaults to "libmtmd.so" on Android which is wrong.
     // We need to explicitly set "libllama.so" as the main library.
     // The libmtmd.so (multimodal) is optional and loaded separately by the library.
     if (Platform.isAndroid) {
+      debugPrint('LlamaService: Android detected - will use libllama.so');
+      debugPrint('LlamaService: llama_cpp_dart will load this library via FFI DynamicLibrary.open()');
+      debugPrint('LlamaService: The library should be in APK lib/<abi>/ directory');
       return 'libllama.so';
     }
     if (Platform.isIOS) {
+      debugPrint('LlamaService: iOS detected - using embedded library');
+      debugPrint('LlamaService: llama_cpp_dart will find it via DynamicLibrary.process()');
       // On iOS, the library is embedded in the app bundle
       // llama_cpp_dart will find it via DynamicLibrary.process()
       return null;
     }
     // Other platforms: use default discovery
+    debugPrint('LlamaService: Other platform - using default discovery');
     return null;
   }
 

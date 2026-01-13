@@ -2,38 +2,43 @@ package com.cruises.mobile
 
 import io.flutter.embedding.android.FlutterActivity
 import android.util.Log
+import android.os.Bundle
 
 class MainActivity: FlutterActivity() {
     companion object {
-        private const val TAG = "LlamaLibLoader"
+        private const val TAG = "CruisesMobile"
+    }
 
-        init {
-            // Pre-load llama.cpp libraries in the correct dependency order
-            // This must happen BEFORE Dart FFI tries to load libllama.so
-            // Otherwise: "dlopen failed: library libggml-cpu.so not found"
-            try {
-                // Load dependencies first (order matters!)
-                tryLoadLibrary("OpenCL")      // GPU acceleration (optional, may not exist on all devices)
-                tryLoadLibrary("ggml-base")   // Base ggml library
-                tryLoadLibrary("ggml-cpu")    // CPU backend
-                tryLoadLibrary("ggml-opencl") // OpenCL backend (optional)
-                tryLoadLibrary("ggml")        // Main ggml library
-                tryLoadLibrary("llama")       // Main llama library
-                Log.i(TAG, "Successfully pre-loaded llama.cpp libraries")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to pre-load llama.cpp libraries: ${e.message}")
-            }
-        }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        Log.i(TAG, "MainActivity onCreate() called")
+        Log.i(TAG, "Letting llama_cpp_dart handle library loading via FFI")
+        Log.i(TAG, "Native library path: ${applicationInfo.nativeLibraryDir}")
+    }
 
-        private fun tryLoadLibrary(name: String) {
-            try {
-                System.loadLibrary(name)
-                Log.d(TAG, "Loaded lib$name.so")
-            } catch (e: UnsatisfiedLinkError) {
-                // Library might not exist (e.g., OpenCL on devices without GPU support)
-                Log.w(TAG, "Could not load lib$name.so: ${e.message}")
-            }
-        }
+    override fun onStart() {
+        super.onStart()
+        Log.d(TAG, "MainActivity onStart() called")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Log.d(TAG, "MainActivity onResume() called")
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Log.d(TAG, "MainActivity onPause() called")
+    }
+
+    override fun onStop() {
+        super.onStop()
+        Log.d(TAG, "MainActivity onStop() called")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.i(TAG, "MainActivity onDestroy() called")
     }
 }
 
