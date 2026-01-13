@@ -225,19 +225,34 @@ class ChatTemplate {
 
   /// Format cruise context into a string for system prompt
   static String formatCruiseContext(CruiseContext context) {
+    if (!context.hasCruiseData) {
+      return '';
+    }
+
     final buffer = StringBuffer();
+    buffer.write('Current cruise information: ');
 
-    if (context.selectedCruise != null) {
-      buffer.write('Current cruise: ${context.selectedCruise!.name}. ');
+    if (context.cruiseCompany != null) {
+      buffer.write('${context.cruiseCompany} ');
     }
 
-    if (context.selectedDestination != null) {
-      buffer.write('Destination: ${context.selectedDestination}. ');
+    if (context.shipName != null) {
+      buffer.write('on ${context.shipName}');
     }
 
-    if (context.preferences.isNotEmpty) {
-      buffer.write('User preferences: ${context.preferences.join(", ")}. ');
+    if (context.itinerary != null) {
+      buffer.write(', ${context.itinerary}');
     }
+
+    if (context.roomType != null) {
+      buffer.write(', ${context.roomType} cabin');
+    }
+
+    if (context.addons.isNotEmpty) {
+      buffer.write(', with ${context.addons.join(", ")}');
+    }
+
+    buffer.write('. ');
 
     return buffer.toString();
   }

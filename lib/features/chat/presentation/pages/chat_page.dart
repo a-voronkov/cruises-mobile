@@ -105,43 +105,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
   }
 
-  Widget _buildModelStatusBanner(AIServiceState aiServiceState) {
-    final theme = Theme.of(context);
-
-    if (aiServiceState.error != null) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        color: theme.colorScheme.errorContainer,
-        child: Row(
-          children: [
-            Icon(Icons.error_outline, color: theme.colorScheme.error),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                aiServiceState.error!,
-                style: TextStyle(color: theme.colorScheme.onErrorContainer),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      color: theme.colorScheme.secondaryContainer,
-      child: Row(
-        children: [
-          Icon(Icons.info_outline, color: theme.colorScheme.onSecondaryContainer),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text('Preparing AI assistant...'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildErrorBanner(String error) {
     final theme = Theme.of(context);
     return Container(

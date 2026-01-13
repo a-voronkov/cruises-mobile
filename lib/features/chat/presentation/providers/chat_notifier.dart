@@ -157,8 +157,9 @@ How can I help you today?''',
       }).toList();
 
       // Add system message with cruise context
-      final systemContent = cruiseContext != null
-          ? 'You are a helpful travel assistant. ${ChatTemplate.formatCruiseContext(cruiseContext)}'
+      final cruiseInfo = ChatTemplate.formatCruiseContext(cruiseContext);
+      final systemContent = cruiseInfo.isNotEmpty
+          ? 'You are a helpful travel assistant. $cruiseInfo'
           : 'You are a helpful travel assistant.';
 
       messages.insert(0, {

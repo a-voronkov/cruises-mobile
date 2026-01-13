@@ -25,7 +25,7 @@ class ModelDownloadService {
     try {
       final raw = HiveService.settingsBox.get(AppConstants.modelStorageKey);
       if (raw is Map) {
-        final map = Map<String, dynamic>.from(raw as Map);
+        final map = Map<String, dynamic>.from(raw);
         _selectedModel = ModelInfo.fromJson(map);
         _selectedModelFileName = _selectedModel?.fileName;
       }
