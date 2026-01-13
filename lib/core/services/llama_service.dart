@@ -126,58 +126,95 @@ class LlamaService {
 
       onProgress?.call(0.5);
       diagnostics['initStage'] = 'pre_llama_init';
-      diagnostics['useMemorymap'] = false; // Track mmap setting for debugging
 
-      // llama_cpp_dart's params are configured via mutable properties (not
-      // constructor named-args). Keep this compatible with older versions.
-      //
-      // IMPORTANT: useMemorymap = false is required on some Android devices
-      // where SELinux prevents mmap of files in app_flutter directory.
-      // This loads the entire model into RAM instead of memory-mapping.
-      // Trade-off: higher RAM usage (~700MB) but more compatible.
-      final modelParams = ModelParams()
-        ..nGpuLayers = 0 // CPU inference for now, can enable GPU later
-        ..vocabOnly = false
-        ..useMemorymap = false // Disabled for Android SELinux compatibility
-        ..useMemoryLock = false;
+	  // llama_cpp_dart's params are configured via mutable properties (not
+	  // constructor named-args). Keep this compatible with older versions.
+	  //
+	  // Memory-mapping (mmap) is generally preferred (lower RAM, faster startup),
+	  // but on some Android devices SELinux/storage constraints can cause mmap to
+	  // fail. We try the preferred setting first, then retry once with the
+	  // opposite setting for compatibility.
+	  final preferredUseMemorymap = true;
+	  final mmapAttempts = preferredUseMemorymap ? <bool>[true, false] : <bool>[false, true];
+	  diagnostics['useMemorymapAttempts'] = mmapAttempts;
 
-      final contextParams = ContextParams()
-        ..nCtx = AppConstants.contextLength
-        ..nBatch = 512
-        ..nThreads = AppConstants.numThreads
-        ..nThreadsBatch = AppConstants.numThreads;
+	  // nBatch impacts temporary allocations during prompt processing. A smaller
+	  // value tends to be more stable on mobile at the cost of throughput.
+	  final nBatch = Platform.isAndroid ? 128 : 512;
+	  diagnostics['nBatch'] = nBatch;
 
-      final samplingParams = SamplerParams()
-        ..temp = AppConstants.temperature
-        ..topK = AppConstants.topK
-        ..topP = AppConstants.topP
-        ..minP = 0.05
-        ..typical = 1.0
-        ..penaltyLastTokens = 64
-        ..penaltyRepeat = AppConstants.repetitionPenalty
-        ..penaltyFreq = 0.0
-        ..penaltyPresent = 0.0
-        ..mirostatTau = 5.0
-        ..mirostatEta = 0.1
-        ..penaltyNewline = false
-        ..seed = 0xFFFFFFFF;
+	  // Sampler params are independent of mmap and can be reused.
+	  final samplingParams = SamplerParams()
+	    ..temp = AppConstants.temperature
+	    ..topK = AppConstants.topK
+	    ..topP = AppConstants.topP
+	    ..minP = 0.05
+	    ..typical = 1.0
+	    ..penaltyLastTokens = 64
+	    ..penaltyRepeat = AppConstants.repetitionPenalty
+	    ..penaltyFreq = 0.0
+	    ..penaltyPresent = 0.0
+	    ..mirostatTau = 5.0
+	    ..mirostatEta = 0.1
+	    ..penaltyNewline = false
+	    ..seed = 0xFFFFFFFF;
 
-      // Create load command with LFM2.5 optimized parameters
-      // Note: ChatML format is configured via ModelParams.formatter in llama_cpp_dart 0.2.x
-      modelParams.formatter = ChatMLFormat();
+	  for (int attemptIndex = 0; attemptIndex < mmapAttempts.length; attemptIndex++) {
+	    final useMemorymap = mmapAttempts[attemptIndex];
+	    diagnostics['useMemorymapAttemptIndex'] = attemptIndex;
+	    diagnostics['useMemorymapAttempt'] = useMemorymap;
 
-      final loadCommand = LlamaLoad(
-        path: _modelPath!,
-        modelParams: modelParams,
-        contextParams: contextParams,
-        samplingParams: samplingParams,
-      );
+	    try {
+	      // Model + context params depend on mmap / batch size.
+	      final modelParams = ModelParams()
+	        ..nGpuLayers = 0 // CPU inference for now, can enable GPU later
+	        ..vocabOnly = false
+	        ..useMemorymap = useMemorymap
+	        ..useMemoryLock = false;
 
-      onProgress?.call(0.7);
+	      final contextParams = ContextParams()
+	        ..nCtx = AppConstants.contextLength
+	        ..nBatch = nBatch
+	        ..nThreads = AppConstants.numThreads
+	        ..nThreadsBatch = AppConstants.numThreads;
 
-      // Initialize LlamaParent (runs in isolate for non-blocking)
-      _llamaParent = LlamaParent(loadCommand);
-      await _llamaParent!.init();
+	      // Note: ChatML format is configured via ModelParams.formatter in llama_cpp_dart 0.2.x
+	      modelParams.formatter = ChatMLFormat();
+
+	      final loadCommand = LlamaLoad(
+	        path: _modelPath!,
+	        modelParams: modelParams,
+	        contextParams: contextParams,
+	        samplingParams: samplingParams,
+	      );
+
+	      onProgress?.call(attemptIndex == 0 ? 0.7 : 0.75);
+
+	      // Initialize LlamaParent (runs in isolate for non-blocking)
+	      _llamaParent = LlamaParent(loadCommand);
+	      await _llamaParent!.init();
+
+	      diagnostics['useMemorymap'] = useMemorymap;
+	      break;
+	    } catch (e, st) {
+	      lastInitError = e;
+	      lastInitStack = st;
+	      diagnostics['llamaInitError_attempt_$attemptIndex'] = e.toString();
+
+	      // Best-effort cleanup before retry.
+	      try {
+	        await _llamaParent?.dispose();
+	      } catch (_) {
+	        // ignore
+	      }
+	      _llamaParent = null;
+
+	      if (attemptIndex == mmapAttempts.length - 1) {
+	        // No more retries.
+	        Error.throwWithStackTrace(e, st);
+	      }
+	    }
+	  }
 
       onProgress?.call(1.0);
 
@@ -395,6 +432,16 @@ class LlamaService {
           // Read value based on type
           dynamic value;
           switch (valueType) {
+	            case 0: // GGUF_TYPE_UINT8
+	            case 1: // GGUF_TYPE_INT8
+	              final b = await file.read(1);
+	              value = b.isNotEmpty ? b[0] : 0;
+	              break;
+	            case 2: // GGUF_TYPE_UINT16
+	            case 3: // GGUF_TYPE_INT16
+	              final b = await file.read(2);
+	              value = b[0] | (b[1] << 8);
+	              break;
             case 8: // GGUF_TYPE_STRING
               final strLenBytes = await file.read(8);
               final strLen = _readUint64LE(strLenBytes);
@@ -407,6 +454,45 @@ class LlamaService {
                 value = '<string len=$strLen>';
               }
               break;
+	            case 9: // GGUF_TYPE_ARRAY
+	              // Array encoding: element_type (uint32) + element_count (uint64) + elements
+	              final elemTypeBytes = await file.read(4);
+	              final elemType = elemTypeBytes[0] | (elemTypeBytes[1] << 8) |
+	                  (elemTypeBytes[2] << 16) | (elemTypeBytes[3] << 24);
+	              final countBytes = await file.read(8);
+	              final count = _readUint64LE(countBytes);
+
+	              if (elemType == 8) {
+	                // String array (e.g., general.tags) – read a small prefix for debug.
+	                final items = <String>[];
+	                const maxItems = 16;
+	                for (int i = 0; i < count; i++) {
+	                  final itemLenBytes = await file.read(8);
+	                  final itemLen = _readUint64LE(itemLenBytes);
+	                  if (itemLen <= 1024) {
+	                    final bytes = await file.read(itemLen.toInt());
+	                    if (i < maxItems) {
+	                      items.add(String.fromCharCodes(bytes));
+	                    }
+	                  } else {
+	                    await file.setPosition(await file.position() + itemLen.toInt());
+	                    if (i < maxItems) {
+	                      items.add('<string len=$itemLen>');
+	                    }
+	                  }
+	                }
+	                value = items;
+	              } else {
+	                final elemSize = _ggufFixedTypeSize(elemType);
+	                if (elemSize == null) {
+	                  // Can't safely skip unknown element type.
+	                  result['metadataReadError'] = 'Unsupported array element type $elemType for key "$key"';
+	                  break;
+	                }
+	                await file.setPosition(await file.position() + (elemSize * count));
+	                value = '<array type=$elemType count=$count>';
+	              }
+	              break;
             case 4: // GGUF_TYPE_UINT32
               final uint32Bytes = await file.read(4);
               value = uint32Bytes[0] | (uint32Bytes[1] << 8) |
@@ -421,6 +507,18 @@ class LlamaService {
               final f32Bytes = await file.read(4);
               value = '<float32>';
               break;
+	            case 10: // GGUF_TYPE_UINT64
+	              final u64Bytes = await file.read(8);
+	              value = _readUint64LE(u64Bytes);
+	              break;
+	            case 11: // GGUF_TYPE_INT64
+	              final i64Bytes = await file.read(8);
+	              value = _readUint64LE(i64Bytes);
+	              break;
+	            case 12: // GGUF_TYPE_FLOAT64
+	              await file.read(8);
+	              value = '<float64>';
+	              break;
             case 7: // GGUF_TYPE_BOOL
               final boolBytes = await file.read(1);
               value = boolBytes[0] != 0;
@@ -468,5 +566,28 @@ class LlamaService {
     return bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24) |
            (bytes[4] << 32) | (bytes[5] << 40) | (bytes[6] << 48) | (bytes[7] << 56);
   }
+
+	  /// Fixed-size GGUF value sizes (in bytes). Returns null for variable-length types.
+	  int? _ggufFixedTypeSize(int valueType) {
+	    switch (valueType) {
+	      case 0: // UINT8
+	      case 1: // INT8
+	      case 7: // BOOL
+	        return 1;
+	      case 2: // UINT16
+	      case 3: // INT16
+	        return 2;
+	      case 4: // UINT32
+	      case 5: // INT32
+	      case 6: // FLOAT32
+	        return 4;
+	      case 10: // UINT64
+	      case 11: // INT64
+	      case 12: // FLOAT64
+	        return 8;
+	      default:
+	        return null;
+	    }
+	  }
 }
 

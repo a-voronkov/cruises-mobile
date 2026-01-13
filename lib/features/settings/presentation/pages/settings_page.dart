@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/model_status_provider.dart';
-import '../../../../core/services/model_download_service.dart';
+import '../../../../core/services/llama_service_provider.dart' show modelDownloadServiceProvider;
 import '../../../../main.dart';
 import '../providers/settings_provider.dart';
 import 'model_selection_page.dart';
@@ -36,7 +36,7 @@ class SettingsPage extends ConsumerWidget {
 
                 // Model section
                 _buildSectionHeader(context, 'AI Model'),
-                _buildModelInfoTile(context),
+                _buildModelInfoTile(context, ref),
                 _buildManageModelsTile(context),
                 _buildRedownloadModelTile(context, ref),
                 _buildDeleteModelTile(context, ref),
@@ -117,19 +117,24 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildModelInfoTile(BuildContext context) {
+  Widget _buildModelInfoTile(BuildContext context, WidgetRef ref) {
+    final downloadService = ref.watch(modelDownloadServiceProvider);
+    final selectedModel = downloadService.selectedModel;
+    final modelName = selectedModel?.name ?? AppConstants.modelName;
+
     return FutureBuilder<int?>(
-      future: ModelDownloadService().getModelSize(),
+      future: downloadService.getModelSize(),
       builder: (context, snapshot) {
         String sizeText = '';
         if (snapshot.hasData && snapshot.data != null) {
           final sizeMB = (snapshot.data! / (1024 * 1024)).toStringAsFixed(0);
           sizeText = ' • $sizeMB MB';
         }
+
         return ListTile(
           leading: const Icon(Icons.smart_toy_outlined),
           title: const Text('Current model'),
-          subtitle: Text('${AppConstants.modelName}$sizeText'),
+          subtitle: Text('$modelName$sizeText'),
           trailing: snapshot.hasData && snapshot.data != null
               ? Icon(Icons.check_circle, color: Colors.green[600])
               : Icon(Icons.warning_amber, color: Colors.orange[600]),
@@ -194,7 +199,7 @@ class SettingsPage extends ConsumerWidget {
             ),
             onPressed: () async {
               Navigator.pop(context);
-              final service = ModelDownloadService();
+              final service = ref.read(modelDownloadServiceProvider);
               final deleted = await service.deleteModel();
               ref.invalidate(modelStatusProvider);
               if (context.mounted) {
@@ -229,7 +234,7 @@ class SettingsPage extends ConsumerWidget {
           FilledButton(
             onPressed: () async {
               Navigator.pop(context);
-              final service = ModelDownloadService();
+              final service = ref.read(modelDownloadServiceProvider);
               await service.deleteModel();
               ref.invalidate(modelStatusProvider);
               if (context.mounted) {
