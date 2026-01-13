@@ -50,13 +50,23 @@ class ModelFilesNotifier extends Notifier<ModelFilesState> {
 
     try {
       final service = ref.read(modelFilesServiceProvider);
+
+      // First, get files without sizes
+      debugPrint('Loading files for $repoId...');
       final files = await service.getONNXFilesByQuantization(repoId);
 
+      // Update state with files (sizes will be fetched in background)
       state = state.copyWith(
         filesByQuantization: files,
         isLoading: false,
       );
+
+      debugPrint('Files loaded, state updated');
+
+      // Note: Sizes are already fetched in getONNXFilesByQuantization
+      // The state update above should trigger UI rebuild with correct sizes
     } catch (e) {
+      debugPrint('Error loading files: $e');
       state = state.copyWith(
         isLoading: false,
         error: e.toString(),

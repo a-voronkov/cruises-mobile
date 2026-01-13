@@ -192,19 +192,40 @@ class HuggingFaceModelFilesService {
       }
     }
 
-    // Attach related files and fetch real sizes
+    // Attach related files
     for (final mainFile in mainFiles) {
       final related = dataFiles[mainFile.path] ?? [];
       mainFile.relatedFiles.addAll(related);
+    }
 
-      // Fetch real size for main file
-      await _fetchRealSize(repoId, mainFile);
+    // Fetch all sizes in parallel
+    debugPrint('Fetching sizes for ${mainFiles.length} main files...');
+    final allFilesToFetch = <HFModelFile>[];
+    for (final mainFile in mainFiles) {
+      allFilesToFetch.add(mainFile);
+      allFilesToFetch.addAll(mainFile.relatedFiles);
+    }
 
-      // Fetch real sizes for related files
-      for (final relatedFile in related) {
-        await _fetchRealSize(repoId, relatedFile);
+    debugPrint('Total files to fetch sizes for: ${allFilesToFetch.length}');
+
+    // Fetch sizes in parallel (max 5 at a time to avoid overwhelming the server)
+    final futures = <Future<void>>[];
+    for (final file in allFilesToFetch) {
+      futures.add(_fetchRealSize(repoId, file));
+
+      // Process in batches of 5
+      if (futures.length >= 5) {
+        await Future.wait(futures);
+        futures.clear();
       }
     }
+
+    // Wait for remaining
+    if (futures.isNotEmpty) {
+      await Future.wait(futures);
+    }
+
+    debugPrint('All sizes fetched!');
 
     // Group by quantization
     final grouped = <String, List<HFModelFile>>{};
@@ -233,7 +254,7 @@ class HuggingFaceModelFilesService {
     try {
       // If size is already known and non-zero, skip
       if (file.size > 0) {
-        debugPrint('Size already known for ${file.path}: ${file.formattedSize}');
+        debugPrint('✓ Size already known for ${file.path}: ${file.formattedSize}');
         return;
       }
 
@@ -244,7 +265,7 @@ class HuggingFaceModelFilesService {
         if (_apiKey != null) 'Authorization': 'Bearer $_apiKey',
       };
 
-      debugPrint('Fetching size for ${file.path} from $url');
+      debugPrint('→ Fetching size for ${file.path}...');
 
       // Try HEAD request first (follows redirects automatically)
       try {
@@ -255,42 +276,71 @@ class HuggingFaceModelFilesService {
 
         final streamedResponse = await _client.send(request);
 
+        debugPrint('  HEAD response: ${streamedResponse.statusCode}');
+        debugPrint('  Headers: ${streamedResponse.headers}');
+
         if (streamedResponse.statusCode == 200) {
           final contentLength = streamedResponse.headers['content-length'];
+          debugPrint('  Content-Length: $contentLength');
+
           if (contentLength != null) {
             final size = int.tryParse(contentLength);
             if (size != null && size > 0) {
               file.size = size;
-              debugPrint('✓ Fetched size for ${file.path}: ${file.formattedSize}');
+              debugPrint('✓ Fetched size for ${file.path}: ${file.formattedSize} ($size bytes)');
               return;
+            } else {
+              debugPrint('  ⚠ Invalid size: $contentLength');
+            }
+          } else {
+            debugPrint('  ⚠ No Content-Length header');
+          }
+        }
+      } catch (e) {
+        debugPrint('  ✗ HEAD request failed: $e');
+      }
+
+      // Fallback: Try to get size from file metadata API
+      try {
+        debugPrint('  Trying metadata API...');
+        final metaUri = Uri.parse('https://huggingface.co/$repoId/resolve/main/${file.path}?download=false');
+        final metaRequest = http.Request('HEAD', metaUri);
+        metaRequest.headers.addAll(headers);
+        metaRequest.followRedirects = false; // Don't follow redirects
+
+        final metaResponse = await _client.send(metaRequest);
+        debugPrint('  Metadata response: ${metaResponse.statusCode}');
+
+        if (metaResponse.statusCode == 302 || metaResponse.statusCode == 301) {
+          // Follow redirect manually to get final URL
+          final location = metaResponse.headers['location'];
+          if (location != null) {
+            debugPrint('  Redirect to: $location');
+            final finalUri = Uri.parse(location);
+            final finalRequest = http.Request('HEAD', finalUri);
+            final finalResponse = await _client.send(finalRequest);
+
+            debugPrint('  Final response: ${finalResponse.statusCode}');
+            final contentLength = finalResponse.headers['content-length'];
+            debugPrint('  Final Content-Length: $contentLength');
+
+            if (contentLength != null) {
+              final size = int.tryParse(contentLength);
+              if (size != null && size > 0) {
+                file.size = size;
+                debugPrint('✓ Fetched size via redirect for ${file.path}: ${file.formattedSize}');
+                return;
+              }
             }
           }
         }
       } catch (e) {
-        debugPrint('HEAD request failed for ${file.path}: $e');
+        debugPrint('  ✗ Metadata API failed: $e');
       }
 
-      // Fallback: Try to get size from LFS pointer API
-      try {
-        final lfsUri = Uri.parse('https://huggingface.co/api/models/$repoId/tree/main/${file.path}');
-        final lfsResponse = await _client.get(lfsUri, headers: headers);
-
-        if (lfsResponse.statusCode == 200) {
-          final data = json.decode(lfsResponse.body) as Map<String, dynamic>;
-          final size = (data['size'] as num?)?.toInt();
-          if (size != null && size > 0) {
-            file.size = size;
-            debugPrint('✓ Fetched size from API for ${file.path}: ${file.formattedSize}');
-            return;
-          }
-        }
-      } catch (e) {
-        debugPrint('API request failed for ${file.path}: $e');
-      }
-
-      debugPrint('⚠ Could not fetch size for ${file.path}');
+      debugPrint('⚠ Could not fetch size for ${file.path} - will show as Unknown');
     } catch (e) {
-      debugPrint('Failed to fetch size for ${file.path}: $e');
+      debugPrint('✗ Failed to fetch size for ${file.path}: $e');
     }
   }
 
