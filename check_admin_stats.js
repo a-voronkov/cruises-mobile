@@ -45,32 +45,51 @@ async function main() {
         const conflictsRes = await fetch(`${BASE_URL}/admin/unified-data/ship-itineraries/conflicts?limit=20&status=pending`);
         if (conflictsRes.ok) results.conflicts = await conflictsRes.json();
 
-        // 5. Check Cruise Details (Verification of Fix)
-        console.log('Checking Cruise Details for ID 17 (known conflict ship)...');
-        // Need to find a cruise ID for ship 17 first
-        const verificationSearch = await fetch(`${BASE_URL}/cruises/search?shipId=17&limit=1`);
-        if (verificationSearch.ok) {
-            const searchData = await verificationSearch.json();
-            if (searchData.cruises && searchData.cruises.length > 0) {
-                const testCruiseId = searchData.cruises[0].id;
-                console.log(`Fetching details for Cruise ID: ${testCruiseId}...`);
-                
-                const detailsRes = await fetch(`${BASE_URL}/cruises/${testCruiseId}`);
-                if (detailsRes.ok) {
-                    const cruiseDetails = await detailsRes.json();
-                    results.verificationDetails = {
-                        cruiseId: cruiseDetails.id,
-                        shipName: cruiseDetails.ship?.name,
-                        itineraryCount: cruiseDetails.itineraries?.length || 0,
-                        itinerariesSample: cruiseDetails.itineraries?.slice(0, 5)
-                    };
-                    console.log(`Cruise ${testCruiseId} Itineraries: ${results.verificationDetails.itineraryCount}`);
+        // 5. Verification: Trigger Consolidation and Check Details
+        console.log('Fetching a known merged cruise from log...');
+        const logRes = await fetch(`${BASE_URL}/admin/unified-data/merge-log?entityType=cruise&limit=1`);
+        if (logRes.ok) {
+            const logData = await logRes.json();
+            if (logData.logs && logData.logs.length > 0) {
+                const log = logData.logs[0];
+                const { masterId, sourceName, sourceEntityId } = log;
+                console.log(`Found merged cruise: MasterID=${masterId}, Source=${sourceName}, SourceID=${sourceEntityId}`);
+
+                // Trigger consolidation
+                console.log('Triggering manual consolidation...');
+                const processRes = await fetch(`${BASE_URL}/admin/unified-data/cruises/process`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ scraper: sourceName, cruiseId: sourceEntityId })
+                });
+
+                if (processRes.ok) {
+                    const processResult = await processRes.json();
+                    console.log('Consolidation result:', JSON.stringify(processResult));
+
+                    // Check details
+                    console.log(`Fetching details for Cruise ID: ${masterId}...`);
+                    const detailsRes = await fetch(`${BASE_URL}/cruises/${masterId}`);
+                    if (detailsRes.ok) {
+                        const cruiseDetails = await detailsRes.json();
+                        results.verificationDetails = {
+                            cruiseId: cruiseDetails.id,
+                            shipName: cruiseDetails.ship?.name,
+                            itineraryCount: cruiseDetails.itineraries?.length || 0,
+                            itinerariesSample: cruiseDetails.itineraries?.slice(0, 5)
+                        };
+                        console.log(`Cruise ${masterId} Itineraries: ${results.verificationDetails.itineraryCount}`);
+                    } else {
+                         console.error('Failed to fetch cruise details:', detailsRes.statusText);
+                    }
                 } else {
-                    results.verificationDetails = { error: detailsRes.statusText };
+                    console.error('Failed to trigger consolidation:', processRes.statusText);
                 }
             } else {
-                console.log('No cruises found for Ship 17 to verify.');
+                console.log('No merge logs found.');
             }
+        } else {
+            console.error('Failed to fetch merge log:', logRes.statusText);
         }
         
         // Write to file

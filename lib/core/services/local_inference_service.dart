@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
-import 'package:fonnx/fonnx.dart';
+// import 'package:fonnx/fonnx.dart'; // TODO: Implement ONNX inference
 import 'package:path_provider/path_provider.dart';
 
 /// Service for local LLM inference using ONNX Runtime (via fonnx)
@@ -12,7 +12,7 @@ import 'package:path_provider/path_provider.dart';
 /// - Text generation logic (sampling, temperature, top-p)
 /// - Token decoding back to text
 class LocalInferenceService {
-  OnnxModel? _model;
+  // OnnxModel? _model; // TODO: Implement ONNX inference
   bool _isInitialized = false;
   String? _currentModelPath;
 
@@ -61,7 +61,8 @@ class LocalInferenceService {
       onProgress?.call(0.6);
 
       // Create ONNX model from bytes
-      _model = await OnnxModel.fromBytes(modelBytes);
+      // TODO: Implement ONNX model loading
+      // _model = await OnnxModel.fromBytes(modelBytes);
 
       onProgress?.call(0.9);
 

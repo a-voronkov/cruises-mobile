@@ -60,7 +60,7 @@
           "mappingProgress": 83
         },
         "overallProgress": 85,
-        "lastUpdated": "2026-01-14T19:19:56.185Z"
+        "lastUpdated": "2026-01-14T19:21:13.199Z"
       },
       "unmappedShipsSample": {
         "entities": [
@@ -169,7 +169,7 @@
           "mappingProgress": 100
         },
         "overallProgress": 98,
-        "lastUpdated": "2026-01-14T19:19:56.290Z"
+        "lastUpdated": "2026-01-14T19:21:13.290Z"
       }
     },
     "netcruise": {
@@ -204,7 +204,7 @@
           "mappingProgress": 100
         },
         "overallProgress": 100,
-        "lastUpdated": "2026-01-14T19:19:56.335Z"
+        "lastUpdated": "2026-01-14T19:21:13.338Z"
       }
     },
     "cruisedomain": {
@@ -239,7 +239,7 @@
           "mappingProgress": 0
         },
         "overallProgress": 100,
-        "lastUpdated": "2026-01-14T19:19:56.376Z"
+        "lastUpdated": "2026-01-14T19:21:13.380Z"
       }
     },
     "cruclub": {
@@ -274,7 +274,7 @@
           "mappingProgress": 100
         },
         "overallProgress": 100,
-        "lastUpdated": "2026-01-14T19:19:56.425Z"
+        "lastUpdated": "2026-01-14T19:21:13.425Z"
       }
     }
   },
@@ -1923,10 +1923,5 @@
         "updatedAt": "2025-11-20T15:33:58.098Z"
       }
     }
-  ],
-  "verificationDetails": {
-    "cruiseId": 3145,
-    "shipName": "Bellissima",
-    "itineraryCount": 0
-  }
+  ]
 }

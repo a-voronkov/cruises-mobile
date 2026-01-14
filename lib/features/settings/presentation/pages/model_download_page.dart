@@ -317,14 +317,8 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
 
       if (!mounted) return;
 
-      // Update AI service with new model
-      final aiService = ref.read(aiServiceProvider);
-      aiService.setModelId(widget.model.id);
-
-      // Save to preferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('selected_model_id', widget.model.id);
-      await prefs.setString('selected_model_name', widget.model.modelName);
+      // Model info is already saved by ModelDownloadService.selectModel()
+      // No need to update AI service here - it will be initialized on next app start
 
       debugPrint('Model saved to preferences: ${widget.model.id}');
 
