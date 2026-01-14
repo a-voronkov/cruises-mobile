@@ -1,11 +1,9 @@
 import 'package:bugsnag_flutter/bugsnag_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'ai_service.dart';
 import 'model_download_service.dart';
 import 'hive_service.dart';
-import '../config/api_config.dart';
 import '../constants/app_constants.dart';
 import '../models/model_info.dart';
 
@@ -26,63 +24,45 @@ final aiServiceInitializerProvider = FutureProvider<bool>((ref) async {
     final aiService = ref.read(aiServiceProvider);
 
     debugPrint('=== AI Service Initialization ===');
-    debugPrint('ApiConfig.isConfigured: ${ApiConfig.isConfigured}');
-    debugPrint('ApiConfig.huggingFaceApiKey length: ${ApiConfig.huggingFaceApiKey.length}');
-    final firstChars = ApiConfig.huggingFaceApiKey.isEmpty
-        ? "EMPTY"
-        : ApiConfig.huggingFaceApiKey.substring(0, ApiConfig.huggingFaceApiKey.length > 10 ? 10 : ApiConfig.huggingFaceApiKey.length);
-    debugPrint('ApiConfig.huggingFaceApiKey (first 10 chars): $firstChars...');
 
-    if (!ApiConfig.isConfigured) {
-      const error = 'HF_TOKEN not configured - API key is empty';
-      debugPrint('ERROR: $error');
-      await bugsnag.notify(Exception(error), null);
+    // Check if there's a saved ONNX model
+    final modelJson = HiveService.settingsBox.get(AppConstants.modelStorageKey);
+    if (modelJson == null) {
+      debugPrint('⚠️ No model selected - user needs to select a model first');
       return false;
     }
 
-    debugPrint('Initializing AIService with API key...');
+    final model = ModelInfo.fromJson(Map<String, dynamic>.from(modelJson as Map));
+    debugPrint('Found saved model: ${model.huggingFaceRepo} (${model.format.name})');
+
+    if (model.format != ModelFormat.onnx) {
+      debugPrint('❌ Saved model is not ONNX format');
+      return false;
+    }
+
+    if (model.huggingFaceRepo == null) {
+      debugPrint('❌ Model has no HuggingFace repo ID');
+      return false;
+    }
+
+    debugPrint('Initializing AIService with ONNX model: ${model.huggingFaceRepo}');
     final success = await aiService.initialize(
-      apiKey: ApiConfig.huggingFaceApiKey,
+      modelId: model.huggingFaceRepo!,
+      modelFileName: model.fileName,
+      onProgress: (progress) {
+        debugPrint('Initialization progress: ${(progress * 100).toStringAsFixed(0)}%');
+      },
     );
 
-    if (!success) {
+    if (success) {
+      debugPrint('✅ AIService initialized successfully');
+    } else {
       const error = 'AIService initialization returned false';
       debugPrint('❌ $error');
       await bugsnag.notify(Exception(error), null);
-      return false;
     }
 
-    debugPrint('✅ AIService initialized successfully (cloud mode)');
-
-    // Check if there's a saved ONNX model to switch to
-    try {
-      final modelJson = HiveService.settingsBox.get(AppConstants.modelStorageKey);
-      if (modelJson != null) {
-        final model = ModelInfo.fromJson(Map<String, dynamic>.from(modelJson as Map));
-        debugPrint('Found saved model: ${model.huggingFaceRepo} (${model.format.name})');
-
-        if (model.format == ModelFormat.onnx && model.huggingFaceRepo != null) {
-          debugPrint('Switching to saved ONNX model...');
-          final switchSuccess = await aiService.switchToModel(
-            modelId: model.huggingFaceRepo!,
-            modelFileName: model.fileName,
-          );
-
-          if (switchSuccess) {
-            debugPrint('✅ Switched to ONNX model: ${model.huggingFaceRepo}');
-          } else {
-            debugPrint('⚠️ Failed to switch to ONNX model, staying in cloud mode');
-          }
-        } else {
-          debugPrint('Saved model is not ONNX, staying in cloud mode');
-        }
-      }
-    } catch (e) {
-      debugPrint('⚠️ Error checking saved model: $e');
-      // Continue with cloud mode
-    }
-
-    return true;
+    return success;
   } catch (e, stackTrace) {
     debugPrint('❌ Exception during AI service initialization: $e');
     debugPrint('Stack trace: $stackTrace');
@@ -114,7 +94,7 @@ class AIServiceState {
   final String? error;
 
   const AIServiceState({
-    this.isReady = true, // Cloud-based service is always ready
+    this.isReady = false,
     this.error,
   });
 

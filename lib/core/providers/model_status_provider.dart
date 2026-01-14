@@ -9,7 +9,7 @@ import '../services/ai_service_provider.dart';
 /// This is used by [AppInitializer] to decide whether to open the chat or the
 /// first-run model setup flow.
 ///
-/// For cloud-based AI, this checks if the service is initialized with API key.
+/// For local ONNX inference, this checks if a model is selected and initialized.
 final modelStatusProvider = FutureProvider<bool>((ref) async {
   try {
     debugPrint('=== Model Status Check ===');

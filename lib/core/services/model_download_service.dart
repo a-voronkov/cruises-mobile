@@ -69,31 +69,31 @@ class ModelDownloadService {
   /// Get the currently selected model (if stored)
   ModelInfo? get selectedModel => _selectedModel;
 
-  /// Set the selected model and switch AI service to use it
+  /// Set the selected model and initialize AI service with it
   Future<void> selectModel(ModelInfo model) async {
     _selectedModel = model;
     _selectedModelFileName = model.fileName;
 
     try {
       await HiveService.settingsBox.put(AppConstants.modelStorageKey, model.toJson());
+      debugPrint('ModelDownloadService: Model saved: ${model.huggingFaceRepo}');
 
-      // Switch AI service to this model if available
+      // Initialize AI service with this model if available
       if (_aiService != null && model.huggingFaceRepo != null) {
-        debugPrint('ModelDownloadService: Switching AI service to model: ${model.huggingFaceRepo}');
+        debugPrint('ModelDownloadService: Initializing AI service with model: ${model.huggingFaceRepo}');
 
-        // For ONNX models, we need to provide the downloaded file name
-        final success = await _aiService!.switchToModel(
+        final success = await _aiService!.initialize(
           modelId: model.huggingFaceRepo!,
           modelFileName: model.fileName,
           onProgress: (progress) {
-            debugPrint('Model switch progress: ${(progress * 100).toStringAsFixed(0)}%');
+            debugPrint('Model initialization progress: ${(progress * 100).toStringAsFixed(0)}%');
           },
         );
 
         if (success) {
-          debugPrint('ModelDownloadService: Successfully switched to ${model.huggingFaceRepo}');
+          debugPrint('ModelDownloadService: Successfully initialized with ${model.huggingFaceRepo}');
         } else {
-          debugPrint('ModelDownloadService: Failed to switch to ${model.huggingFaceRepo}');
+          debugPrint('ModelDownloadService: Failed to initialize with ${model.huggingFaceRepo}');
         }
       }
     } catch (e) {

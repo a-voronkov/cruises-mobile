@@ -34,14 +34,13 @@ async function run() {
 
     const results = [];
 
-    // Process in chunks to avoid overwhelming the server (though 50 is likely fine)
     // Sequential for simplicity
+    console.log('Counting cruises for each company...');
     for (const cl of cruiseLines) {
-        process.stdout.write(`Checking ${cl.name}... `);
         const url = `https://cruises.voronkov.club/api/cruises/search?startDate=${today}&cruiseLineId=${cl.id}&limit=1`;
         const data = await fetch(url);
         const count = data.total || 0;
-        console.log(count);
+        // console.log(`${cl.name}: ${count}`);
         results.push({ name: cl.name, count });
     }
 
