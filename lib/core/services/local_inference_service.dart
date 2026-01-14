@@ -2,17 +2,17 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
-import 'package:onnxruntime/onnxruntime.dart';
+import 'package:fonnx/fonnx.dart';
 import 'package:path_provider/path_provider.dart';
 
-/// Service for local LLM inference using ONNX Runtime
+/// Service for local LLM inference using ONNX Runtime (via fonnx)
 ///
 /// Note: This is a basic implementation. For full text generation support, you'll need:
 /// - A tokenizer (e.g., from HuggingFace tokenizers library)
 /// - Text generation logic (sampling, temperature, top-p)
 /// - Token decoding back to text
 class LocalInferenceService {
-  OrtSession? _session;
+  OnnxModel? _model;
   bool _isInitialized = false;
   String? _currentModelPath;
 
@@ -38,11 +38,6 @@ class LocalInferenceService {
         return true;
       }
 
-      onProgress?.call(0.1);
-
-      // Initialize ONNX Runtime
-      OrtEnv.instance.init();
-
       onProgress?.call(0.2);
 
       // Get model path
@@ -60,13 +55,13 @@ class LocalInferenceService {
 
       debugPrint('LocalInferenceService: Loading ONNX model from $modelPath');
 
-      // Create session options
-      final sessionOptions = OrtSessionOptions();
+      // Read model file
+      final modelBytes = await modelFile.readAsBytes();
 
       onProgress?.call(0.6);
 
-      // Create session from file
-      _session = OrtSession.fromFile(modelPath, sessionOptions);
+      // Create ONNX model from bytes
+      _model = await OnnxModel.fromBytes(modelBytes);
 
       onProgress?.call(0.9);
 
@@ -75,9 +70,7 @@ class LocalInferenceService {
 
       onProgress?.call(1.0);
 
-      debugPrint('LocalInferenceService: ONNX session initialized successfully');
-      debugPrint('Input names: ${_session!.inputNames}');
-      debugPrint('Output names: ${_session!.outputNames}');
+      debugPrint('LocalInferenceService: ONNX model initialized successfully');
 
       return true;
     } catch (e, stackTrace) {
@@ -109,7 +102,7 @@ class LocalInferenceService {
     double temperature = 0.7,
     double topP = 0.9,
   }) async {
-    if (!_isInitialized || _session == null) {
+    if (!_isInitialized || _model == null) {
       throw StateError('LocalInferenceService not initialized');
     }
 
@@ -140,7 +133,7 @@ class LocalInferenceService {
     double temperature = 0.7,
     double topP = 0.9,
   }) async* {
-    if (!_isInitialized || _session == null) {
+    if (!_isInitialized || _model == null) {
       throw StateError('LocalInferenceService not initialized');
     }
 
@@ -151,11 +144,10 @@ class LocalInferenceService {
 
   /// Dispose the service and free resources
   void dispose() {
-    _session?.release();
-    _session = null;
+    _model?.dispose();
+    _model = null;
     _isInitialized = false;
     _currentModelPath = null;
-    OrtEnv.instance.release();
     debugPrint('LocalInferenceService: Disposed');
   }
 }

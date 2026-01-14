@@ -1,7 +1,7 @@
 name: cruises_mobile
 description: An autonomous travel planning assistant with embedded LLM for mobile platforms.
 publish_to: 'none'
-version: 0.0.13+69
+version: 0.0.13+70
 
 environment:
   sdk: '>=3.7.0 <4.0.0'
@@ -50,8 +50,11 @@ dependencies:
   # HTTP client for HuggingFace API
   http: ^1.2.0
 
-  # ONNX Runtime for local inference
-  onnxruntime: ^1.19.2
+  # ONNX Runtime for local inference (via fonnx from GitHub)
+  fonnx:
+    git:
+      url: https://github.com/Telosnex/fonnx.git
+      ref: main
 
 dev_dependencies:
   flutter_test:
