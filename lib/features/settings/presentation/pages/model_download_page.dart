@@ -317,14 +317,33 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
 
       if (!mounted) return;
 
-      // Model info is already saved by ModelDownloadService.selectModel()
-      // No need to update AI service here - it will be initialized on next app start
+      // Reinitialize AI service with the new model
+      // Use the main file (first in the list) as the model file
+      final mainFileName = file.path.split('/').last;
+      debugPrint('Reinitializing AI service with new model: ${widget.model.id} (file: $mainFileName)');
+      final aiService = ref.read(aiServiceProvider);
+      final initSuccess = await aiService.initialize(
+        modelId: widget.model.id,
+        modelFileName: mainFileName,
+        onProgress: (progress) {
+          debugPrint('AI service init progress: ${(progress * 100).toStringAsFixed(0)}%');
+        },
+      );
+
+      if (initSuccess) {
+        debugPrint('✅ AI service reinitialized successfully');
+      } else {
+        debugPrint('⚠️ AI service reinitialization failed');
+      }
+
+      // Invalidate AI service state to refresh UI
+      ref.invalidate(aiServiceInitializerProvider);
 
       debugPrint('Model saved to preferences: ${widget.model.id}');
 
       if (!mounted) return;
 
-      // Show success message with important note
+      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Column(
@@ -333,13 +352,15 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
             children: [
               Text('Model ${widget.model.modelName} downloaded!'),
               const SizedBox(height: 4),
-              const Text(
-                'Note: Local ONNX inference not yet implemented. Using cloud API for now.',
-                style: TextStyle(fontSize: 12),
+              Text(
+                initSuccess
+                    ? 'Model is ready for local inference'
+                    : 'Note: Model downloaded but initialization failed. Please restart the app.',
+                style: const TextStyle(fontSize: 12),
               ),
             ],
           ),
-          backgroundColor: Colors.orange,
+          backgroundColor: initSuccess ? Colors.green : Colors.orange,
           duration: const Duration(seconds: 5),
         ),
       );
