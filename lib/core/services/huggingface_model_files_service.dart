@@ -288,132 +288,21 @@ class HuggingFaceModelFilesService {
   /// Fetch real file size using HEAD request with redirect following
   Future<void> _fetchRealSize(String repoId, HFModelFile file) async {
     try {
-      // For ONNX/GGUF files, the size from API is often just the Git LFS pointer size
-      // We need to fetch the real size via HEAD request
-      // Skip only if size is already large (> 10 MB), indicating it's the real file size
+      // Skip if size is already large (> 10 MB), indicating it's the real file size from LFS
       const minModelSize = 10 * 1024 * 1024; // 10 MB
       if (file.size > minModelSize) {
         debugPrint('✓ Size already known for ${file.path}: ${file.formattedSize}');
         return;
       }
 
-      final url = file.getDownloadUrl(repoId);
-      final uri = Uri.parse(url);
+      // For small files (< 10 MB), they might be:
+      // 1. Git LFS pointer files (need to fetch real size)
+      // 2. Actually small files (config, tokenizer, etc.)
+      // We'll just keep the size from LFS API and mark them as potentially incomplete
 
-      final headers = <String, String>{
-        if (_apiKey != null) 'Authorization': 'Bearer $_apiKey',
-      };
+      debugPrint('⚠ Small file detected: ${file.path} (${file.formattedSize}) - keeping LFS size');
+      // Don't try to fetch size for small files - it's unreliable and slow
 
-      debugPrint('→ Fetching size for ${file.path}...');
-
-      // Try HEAD request first (follows redirects automatically)
-      try {
-        final request = http.Request('HEAD', uri);
-        request.headers.addAll(headers);
-        request.followRedirects = true;
-        request.maxRedirects = 5;
-
-        final streamedResponse = await _client.send(request);
-
-        debugPrint('  HEAD response: ${streamedResponse.statusCode}');
-
-        if (streamedResponse.statusCode == 200) {
-          // For Git LFS files, HuggingFace returns X-Linked-Size header with real file size
-          final linkedSize = streamedResponse.headers['x-linked-size'];
-          if (linkedSize != null) {
-            final size = int.tryParse(linkedSize);
-            if (size != null && size > 0) {
-              file.size = size;
-              debugPrint('✓ Fetched size via X-Linked-Size for ${file.path}: ${file.formattedSize} ($size bytes)');
-              return;
-            }
-          }
-
-          // Check Content-Length
-          final contentLength = streamedResponse.headers['content-length'];
-          if (contentLength != null) {
-            final size = int.tryParse(contentLength);
-            if (size != null && size > 0) {
-              // If size is suspiciously small for a model file (< 1 MB), it's likely a Git LFS pointer
-              // Try the fallback method to get the real size
-              const minRealFileSize = 1024 * 1024; // 1 MB
-              if (size < minRealFileSize && (file.isONNX || file.isGGUF)) {
-                debugPrint('  ⚠ Size too small ($size bytes), likely LFS pointer - trying fallback...');
-                // Don't return, fall through to fallback method
-              } else {
-                file.size = size;
-                debugPrint('✓ Fetched size via Content-Length for ${file.path}: ${file.formattedSize} ($size bytes)');
-                return;
-              }
-            }
-          }
-
-          if (linkedSize == null && contentLength == null) {
-            debugPrint('  ⚠ No size headers found (X-Linked-Size or Content-Length)');
-          }
-        }
-      } catch (e) {
-        debugPrint('  ✗ HEAD request failed: $e');
-      }
-
-      // Fallback: Try to get size from file metadata API
-      try {
-        debugPrint('  Trying metadata API...');
-        final metaUri = Uri.parse('https://huggingface.co/$repoId/resolve/main/${file.path}?download=false');
-        final metaRequest = http.Request('HEAD', metaUri);
-        metaRequest.headers.addAll(headers);
-        metaRequest.followRedirects = false; // Don't follow redirects
-
-        final metaResponse = await _client.send(metaRequest);
-        debugPrint('  Metadata response: ${metaResponse.statusCode}');
-
-        // Check for X-Linked-Size in the redirect response
-        final linkedSize = metaResponse.headers['x-linked-size'];
-        if (linkedSize != null) {
-          final size = int.tryParse(linkedSize);
-          if (size != null && size > 0) {
-            file.size = size;
-            debugPrint('✓ Fetched size via X-Linked-Size (redirect) for ${file.path}: ${file.formattedSize}');
-            return;
-          }
-        }
-
-        if (metaResponse.statusCode == 302 || metaResponse.statusCode == 301) {
-          // Follow redirect manually to get final URL
-          final location = metaResponse.headers['location'];
-          if (location != null) {
-            debugPrint('  Redirect to: ${location.substring(0, location.length > 200 ? 200 : location.length)}...');
-            final finalUri = Uri.parse(location);
-            final finalRequest = http.Request('HEAD', finalUri);
-            final finalResponse = await _client.send(finalRequest);
-
-            debugPrint('  Final response: ${finalResponse.statusCode}');
-
-            // Check all size-related headers
-            debugPrint('  Headers: ${finalResponse.headers.keys.join(", ")}');
-            final contentLength = finalResponse.headers['content-length'];
-            final xLinkedSize = finalResponse.headers['x-linked-size'];
-
-            debugPrint('  Content-Length: $contentLength');
-            debugPrint('  X-Linked-Size: $xLinkedSize');
-
-            // Prefer X-Linked-Size over Content-Length
-            final sizeStr = xLinkedSize ?? contentLength;
-            if (sizeStr != null) {
-              final size = int.tryParse(sizeStr);
-              if (size != null && size > 0) {
-                file.size = size;
-                debugPrint('✓ Fetched size via redirect for ${file.path}: ${file.formattedSize}');
-                return;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        debugPrint('  ✗ Metadata API failed: $e');
-      }
-
-      debugPrint('⚠ Could not fetch size for ${file.path} - will show as Unknown');
     } catch (e) {
       debugPrint('✗ Failed to fetch size for ${file.path}: $e');
     }

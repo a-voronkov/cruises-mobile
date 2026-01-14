@@ -224,24 +224,17 @@ class ModelDownloadService {
       // Store task
       _currentTask = task;
 
-      // Listen to progress updates
-      FileDownloader().updates.listen((update) {
-        if (update is TaskProgressUpdate && update.task.taskId == task.taskId) {
-          final progress = update.progress;
-          final expectedFileSize = update.expectedFileSize ?? 0;
-          final receivedMB = (expectedFileSize * progress / (1024 * 1024)).toStringAsFixed(1);
-          final totalMB = (expectedFileSize / (1024 * 1024)).toStringAsFixed(1);
-
-          if (expectedFileSize > 0) {
-            onProgress(
-              progress,
-              'Downloading: $receivedMB MB / $totalMB MB',
-            );
-          } else {
-            onProgress(progress, 'Downloading: $receivedMB MB');
-          }
-        } else if (update is TaskStatusUpdate && update.task.taskId == task.taskId) {
-          switch (update.status) {
+      // Start download and listen to updates
+      final result = await FileDownloader().download(
+        task,
+        onProgress: (progress) {
+          // This callback is called for progress updates
+          onProgress(progress, 'Downloading: ${(progress * 100).toStringAsFixed(0)}%');
+        },
+        onStatus: (status) {
+          // This callback is called for status changes
+          debugPrint('Download status: $status');
+          switch (status) {
             case TaskStatus.complete:
               onProgress(1.0, 'Download complete!');
               break;
@@ -257,11 +250,8 @@ class ModelDownloadService {
             default:
               break;
           }
-        }
-      });
-
-      // Start download
-      final result = await FileDownloader().download(task);
+        },
+      );
 
       // Verify download
       if (result.status == TaskStatus.complete) {
