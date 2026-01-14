@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import '../models/model_info.dart';
 import '../services/model_download_service.dart';
 import '../services/ai_service_provider.dart';
+import 'model_status_provider.dart';
 
 // Re-export modelDownloadServiceProvider so UI layers can access it from one place.
 export '../services/ai_service_provider.dart' show modelDownloadServiceProvider;
@@ -82,8 +83,13 @@ class ModelDownloadNotifier extends StateNotifier<ModelDownloadState> {
       downloadingModelId: null,
     );
 
-    // Refresh downloaded models list.
+    // Refresh downloaded models list and model status.
     _ref.invalidate(downloadedModelsProvider);
+
+    if (success) {
+      // Invalidate model status to trigger navigation check
+      _ref.invalidate(modelStatusProvider);
+    }
 
     return success;
   }

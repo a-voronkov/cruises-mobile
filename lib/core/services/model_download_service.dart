@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -7,12 +8,20 @@ import '../constants/app_constants.dart';
 import '../models/model_info.dart';
 import 'hive_service.dart';
 import 'ai_service.dart';
+import 'network_monitor_service.dart';
 
 /// Service for downloading and managing the LLM model file
 class ModelDownloadService {
   final Dio _dio;
   final AIService? _aiService;
+  final NetworkMonitorService _networkMonitor;
   DownloadTask? _currentTask;
+
+  StreamSubscription<bool>? _networkSubscription;
+  bool _shouldResumeOnReconnect = false;
+  String? _pausedDownloadUrl;
+  String? _pausedDownloadPath;
+  void Function(double, String)? _pausedProgressCallback;
 
   /// Currently selected model filename (null = default from AppConstants)
   String? _selectedModelFileName;
@@ -20,11 +29,28 @@ class ModelDownloadService {
   /// Currently selected model info (persisted in Hive settings box)
   ModelInfo? _selectedModel;
 
-  ModelDownloadService({Dio? dio, AIService? aiService})
-      : _dio = dio ?? Dio(),
-        _aiService = aiService {
+  ModelDownloadService({
+    Dio? dio,
+    AIService? aiService,
+    NetworkMonitorService? networkMonitor,
+  })  : _dio = dio ?? Dio(),
+        _aiService = aiService,
+        _networkMonitor = networkMonitor ?? NetworkMonitorService() {
     _loadSelectedModelFromStorage();
     _initializeBackgroundDownloader();
+    _initializeNetworkMonitoring();
+  }
+
+  /// Initialize network monitoring for auto-resume
+  void _initializeNetworkMonitoring() {
+    _networkMonitor.initialize();
+
+    _networkSubscription = _networkMonitor.connectivityStream.listen((isConnected) {
+      if (isConnected && _shouldResumeOnReconnect) {
+        debugPrint('NetworkMonitor: Internet restored, resuming download...');
+        _resumeDownload();
+      }
+    });
   }
 
   /// Initialize background downloader
@@ -203,6 +229,29 @@ class ModelDownloadService {
     }
   }
 
+  /// Resume paused download
+  Future<void> _resumeDownload() async {
+    if (_pausedDownloadUrl == null || _pausedDownloadPath == null || _pausedProgressCallback == null) {
+      debugPrint('Cannot resume: missing download info');
+      return;
+    }
+
+    if (_currentTask == null) {
+      debugPrint('Cannot resume: no current task');
+      return;
+    }
+
+    debugPrint('Resuming download: ${_currentTask!.filename}');
+    _shouldResumeOnReconnect = false;
+
+    // Resume the task
+    final resumed = await FileDownloader().resume(_currentTask!);
+    if (!resumed) {
+      debugPrint('Failed to resume download');
+      _pausedProgressCallback!(0, 'Failed to resume download');
+    }
+  }
+
   /// Download the model with progress callback
   ///
   /// [onProgress] - Callback with progress (0.0 to 1.0) and status message
@@ -222,6 +271,11 @@ class ModelDownloadService {
 
       // Build download URL - use custom URL if provided, otherwise use default server
       final downloadUrl = modelInfo?.downloadUrl ?? '${AppConstants.modelServerBaseUrl}/$fileName';
+
+      // Store download info for resume
+      _pausedDownloadUrl = downloadUrl;
+      _pausedDownloadPath = modelPath;
+      _pausedProgressCallback = onProgress;
 
       onProgress(0, 'Starting download...');
 
@@ -261,15 +315,26 @@ class ModelDownloadService {
           switch (status) {
             case TaskStatus.complete:
               onProgress(1.0, 'Download complete!');
+              _shouldResumeOnReconnect = false;
               break;
             case TaskStatus.failed:
-              onProgress(0, 'Download failed');
+              // Check if it's a network error
+              if (!_networkMonitor.isConnected) {
+                debugPrint('Download failed due to network loss, will resume when connected');
+                _shouldResumeOnReconnect = true;
+                onProgress(0, 'Waiting for internet connection...');
+              } else {
+                onProgress(0, 'Download failed');
+                _shouldResumeOnReconnect = false;
+              }
               break;
             case TaskStatus.canceled:
               onProgress(0, 'Download cancelled');
+              _shouldResumeOnReconnect = false;
               break;
             case TaskStatus.paused:
               onProgress(0, 'Download paused');
+              // Don't set resume flag for manual pause
               break;
             default:
               break;
@@ -380,6 +445,12 @@ class ModelDownloadService {
     } catch (e) {
       return null;
     }
+  }
+
+  /// Dispose resources
+  void dispose() {
+    _networkSubscription?.cancel();
+    _networkMonitor.dispose();
   }
 }
 

@@ -126,9 +126,11 @@ class HuggingFaceModelFilesService {
   ///
   /// [repoId] - HuggingFace repository ID (e.g., "meta-llama/Llama-3.2-1B-Instruct")
   /// [fileType] - Filter by file extension (e.g., "onnx", "gguf")
+  /// [includeTokenizer] - Include tokenizer and config files
   Future<List<HFModelFile>> getModelFiles({
     required String repoId,
     String? fileType,
+    bool includeTokenizer = false,
   }) async {
     final allFiles = <HFModelFile>[];
 
@@ -143,8 +145,21 @@ class HuggingFaceModelFilesService {
         if (ext != fileType.toLowerCase()) return false;
       }
 
-      // Only include model files (ONNX or GGUF)
-      return file.isONNX || file.isGGUF;
+      // Include model files (ONNX or GGUF)
+      if (file.isONNX || file.isGGUF) return true;
+
+      // Include tokenizer and config files if requested
+      if (includeTokenizer) {
+        final fileName = file.path.toLowerCase();
+        return fileName.endsWith('tokenizer.json') ||
+               fileName.endsWith('tokenizer_config.json') ||
+               fileName.endsWith('vocab.json') ||
+               fileName.endsWith('config.json') ||
+               fileName.endsWith('generation_config.json') ||
+               fileName.endsWith('special_tokens_map.json');
+      }
+
+      return false;
     }).toList();
 
     debugPrint('Found ${filteredFiles.length} model files (total: ${allFiles.length})');
@@ -210,14 +225,19 @@ class HuggingFaceModelFilesService {
   /// Get ONNX files grouped by quantization
   ///
   /// Groups main .onnx files with their _data files and fetches real sizes
+  /// Also includes tokenizer and config files
   Future<Map<String, List<HFModelFile>>> getONNXFilesByQuantization(String repoId) async {
-    final allFiles = await getModelFiles(repoId: repoId, fileType: 'onnx');
+    // Get model files AND tokenizer files
+    final modelFiles = await getModelFiles(repoId: repoId, fileType: 'onnx');
+    final tokenizerFiles = await getModelFiles(repoId: repoId, includeTokenizer: true);
+
+    debugPrint('Found ${tokenizerFiles.length} tokenizer/config files');
 
     // Separate main files and data files
     final mainFiles = <HFModelFile>[];
     final dataFiles = <String, List<HFModelFile>>{};
 
-    for (final file in allFiles) {
+    for (final file in modelFiles) {
       final fileName = file.path.toLowerCase();
       if (fileName.endsWith('.onnx') && !fileName.contains('_data')) {
         mainFiles.add(file);
@@ -228,19 +248,30 @@ class HuggingFaceModelFilesService {
       }
     }
 
-    // Attach related files
+    // Attach related files (data files + tokenizer files)
     for (final mainFile in mainFiles) {
       final related = dataFiles[mainFile.path] ?? [];
       mainFile.relatedFiles.addAll(related);
+
+      // Add tokenizer files to each model
+      mainFile.relatedFiles.addAll(tokenizerFiles);
     }
 
+    debugPrint('Each model will download ${tokenizerFiles.length} tokenizer files');
+
     // Fetch all sizes in parallel
-    debugPrint('Fetching sizes for ${mainFiles.length} main files...');
+    debugPrint('Fetching sizes for ${mainFiles.length} main files + tokenizer files...');
     final allFilesToFetch = <HFModelFile>[];
+
+    // Add all model files
     for (final mainFile in mainFiles) {
       allFilesToFetch.add(mainFile);
-      allFilesToFetch.addAll(mainFile.relatedFiles);
+      // Add data files (but not tokenizer files yet, to avoid duplicates)
+      allFilesToFetch.addAll(dataFiles[mainFile.path] ?? []);
     }
+
+    // Add tokenizer files once
+    allFilesToFetch.addAll(tokenizerFiles);
 
     debugPrint('Total files to fetch sizes for: ${allFilesToFetch.length}');
 
