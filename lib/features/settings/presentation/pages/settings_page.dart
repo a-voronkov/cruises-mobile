@@ -37,6 +37,7 @@ class SettingsPage extends ConsumerWidget {
                 // Model section
                 _buildSectionHeader(context, 'AI Model'),
                 _buildModelInfoTile(context, ref),
+                _buildResetModelTile(context, ref),
                 _buildManageModelsTile(context),
                 _buildRedownloadModelTile(context, ref),
                 _buildDeleteModelTile(context, ref),
@@ -141,6 +142,15 @@ class SettingsPage extends ConsumerWidget {
     };
   }
 
+  Widget _buildResetModelTile(BuildContext context, WidgetRef ref) {
+    return ListTile(
+      leading: const Icon(Icons.refresh_outlined),
+      title: const Text('Reset to default model'),
+      subtitle: const Text('Clear saved model and use default cloud model'),
+      onTap: () => _showResetModelDialog(context, ref),
+    );
+  }
+
   Widget _buildManageModelsTile(BuildContext context) {
     return ListTile(
       leading: const Icon(Icons.model_training_outlined),
@@ -209,6 +219,44 @@ class SettingsPage extends ConsumerWidget {
               }
             },
             child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showResetModelDialog(BuildContext context, WidgetRef ref) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset to default model?'),
+        content: const Text(
+          'This will clear the saved model selection and use the default cloud model. '
+          'The app will restart.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              // Clear saved model from SharedPreferences
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove('selected_model_id');
+              await prefs.remove('selected_model_name');
+
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Model reset to default. Please restart the app manually.'),
+                    duration: Duration(seconds: 5),
+                  ),
+                );
+              }
+            },
+            child: const Text('Reset'),
           ),
         ],
       ),

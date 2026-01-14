@@ -7,9 +7,9 @@ class AppConstants {
   static const String appVersion = '1.0.0';
 
   // Model Configuration - HuggingFace API
-  // Using Qwen2.5-Coder-0.5B-Instruct - small, fast, and supports Inference API
-  static const String defaultModelId = 'Qwen/Qwen2.5-Coder-0.5B-Instruct';
-  static const String modelName = 'Qwen2.5-Coder-0.5B-Instruct';
+  // Using google/flan-t5-base - reliable model that supports Serverless Inference API
+  static const String defaultModelId = 'google/flan-t5-base';
+  static const String modelName = 'FLAN-T5-Base';
   static const String modelVersion = 'HF-API';
 
   // Legacy GGUF configuration (deprecated, kept for backwards compatibility)
