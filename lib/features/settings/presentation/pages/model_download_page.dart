@@ -274,10 +274,12 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
         _downloadStatus = 'Downloading $totalFiles file${totalFiles > 1 ? 's' : ''}...';
       });
 
-      // Download all files
+      // Download all files sequentially
       for (int i = 0; i < allFiles.length; i++) {
         final currentFile = allFiles[i];
         final fileName = currentFile.path.split('/').last;
+
+        debugPrint('📥 Starting download ${i + 1}/$totalFiles: $fileName');
 
         setState(() {
           _downloadStatus = 'Downloading ${i + 1}/$totalFiles: $fileName';
@@ -311,9 +313,20 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
         );
 
         if (!success) {
+          debugPrint('❌ Failed to download $fileName');
           throw Exception('Failed to download $fileName');
         }
+
+        debugPrint('✅ Successfully downloaded ${i + 1}/$totalFiles: $fileName');
+
+        // Small delay between downloads to let background downloader clean up
+        if (i < allFiles.length - 1) {
+          debugPrint('⏳ Waiting 1 second before next download...');
+          await Future.delayed(const Duration(seconds: 1));
+        }
       }
+
+      debugPrint('🎉 All $totalFiles files downloaded successfully!');
 
       if (!mounted) return;
 

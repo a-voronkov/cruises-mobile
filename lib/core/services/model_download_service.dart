@@ -295,6 +295,7 @@ class ModelDownloadService {
       _pausedProgressCallback = onProgress;
 
       onProgress(0, 'Starting download...');
+      debugPrint('📥 Starting download: $fileName from $downloadUrl');
 
       // Get directory for download
       final directory = await getApplicationDocumentsDirectory();
@@ -303,8 +304,10 @@ class ModelDownloadService {
         modelsDir.createSync(recursive: true);
       }
 
-      // Create download task
+      // Create download task with unique taskId
+      final taskId = '${fileName}_${DateTime.now().millisecondsSinceEpoch}';
       final task = DownloadTask(
+        taskId: taskId,
         url: downloadUrl,
         filename: fileName,
         directory: 'models',
@@ -319,22 +322,31 @@ class ModelDownloadService {
       // Store task
       _currentTask = task;
 
+      debugPrint('📦 Created download task: $taskId for $fileName');
+
+      // Track completion
+      var isComplete = false;
+      var hasFailed = false;
+
       // Start download and listen to updates
       final result = await FileDownloader().download(
         task,
         onProgress: (progress) {
           // This callback is called for progress updates
+          debugPrint('📊 Download progress for $fileName: ${(progress * 100).toStringAsFixed(1)}%');
           onProgress(progress, 'Downloading: ${(progress * 100).toStringAsFixed(0)}%');
         },
         onStatus: (status) {
           // This callback is called for status changes
-          debugPrint('Download status: $status');
+          debugPrint('📌 Download status for $fileName: $status');
           switch (status) {
             case TaskStatus.complete:
+              isComplete = true;
               onProgress(1.0, 'Download complete!');
               _shouldResumeOnReconnect = false;
               break;
             case TaskStatus.failed:
+              hasFailed = true;
               // Check if it's a network error
               if (!_networkMonitor.isConnected) {
                 debugPrint('Download failed due to network loss, will resume when connected');
@@ -346,6 +358,7 @@ class ModelDownloadService {
               }
               break;
             case TaskStatus.canceled:
+              hasFailed = true;
               onProgress(0, 'Download cancelled');
               _shouldResumeOnReconnect = false;
               break;
@@ -359,12 +372,18 @@ class ModelDownloadService {
         },
       );
 
+      debugPrint('✅ Download completed with status: ${result.status} for $fileName');
+
       // Verify download
-      if (result.status == TaskStatus.complete) {
+      debugPrint('🔍 Verifying download for $fileName...');
+
+      if (result.status == TaskStatus.complete && isComplete) {
         final file = File(modelPath);
         if (file.existsSync()) {
           final fileSize = file.lengthSync();
           final fileNameLower = fileName.toLowerCase();
+
+          debugPrint('📁 File exists: $modelPath (${fileSize} bytes)');
 
           // Check file size based on file type
           bool isValidSize = false;
@@ -372,28 +391,39 @@ class ModelDownloadService {
             // Model files should be > 100MB
             isValidSize = fileSize > 100 * 1024 * 1024;
             if (!isValidSize) {
-              debugPrint('Model file too small: ${fileSize / 1024 / 1024} MB');
+              debugPrint('❌ Model file too small: ${fileSize / 1024 / 1024} MB');
+            } else {
+              debugPrint('✅ Model file size OK: ${fileSize / 1024 / 1024} MB');
             }
           } else {
             // Tokenizer and config files just need to have content
             isValidSize = fileSize > 0;
-            debugPrint('Small file detected (${fileSize} bytes): $fileName - this is OK for tokenizer/config files');
+            debugPrint('✅ Small file detected (${fileSize} bytes): $fileName - this is OK for tokenizer/config files');
           }
 
           if (isValidSize) {
             // Update selected model on successful download (only for main model files)
             if (modelInfo != null && (fileNameLower.endsWith('.onnx') || fileNameLower.endsWith('.gguf'))) {
+              debugPrint('💾 Selecting model: ${modelInfo.id}');
               await selectModel(modelInfo);
             }
             _currentTask = null;
+            debugPrint('✅ Download verified successfully for $fileName');
             return true;
           } else {
+            debugPrint('❌ File size validation failed for $fileName');
             onProgress(0, 'Error: Downloaded file is too small');
             file.deleteSync();
             _currentTask = null;
             return false;
           }
+        } else {
+          debugPrint('❌ File not found after download: $modelPath');
         }
+      } else if (hasFailed) {
+        debugPrint('❌ Download failed for $fileName');
+      } else {
+        debugPrint('⚠️ Download status unclear for $fileName: ${result.status}');
       }
 
       _currentTask = null;
