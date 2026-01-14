@@ -10,7 +10,7 @@ import 'hive_service.dart';
 /// Service for downloading and managing the LLM model file
 class ModelDownloadService {
   final Dio _dio;
-  String? _currentTaskId;
+  DownloadTask? _currentTask;
 
   /// Currently selected model filename (null = default from AppConstants)
   String? _selectedModelFileName;
@@ -221,17 +221,18 @@ class ModelDownloadService {
         metaData: modelInfo?.id ?? fileName,
       );
 
-      // Store task ID
-      _currentTaskId = task.taskId;
+      // Store task
+      _currentTask = task;
 
       // Listen to progress updates
       FileDownloader().updates.listen((update) {
-        if (update is TaskProgressUpdate && update.task.taskId == _currentTaskId) {
+        if (update is TaskProgressUpdate && update.task.taskId == task.taskId) {
           final progress = update.progress;
-          final receivedMB = ((update.task.fileSize ?? 0) * progress / (1024 * 1024)).toStringAsFixed(1);
-          final totalMB = ((update.task.fileSize ?? 0) / (1024 * 1024)).toStringAsFixed(1);
+          final expectedFileSize = update.expectedFileSize ?? 0;
+          final receivedMB = (expectedFileSize * progress / (1024 * 1024)).toStringAsFixed(1);
+          final totalMB = (expectedFileSize / (1024 * 1024)).toStringAsFixed(1);
 
-          if (update.task.fileSize != null && update.task.fileSize! > 0) {
+          if (expectedFileSize > 0) {
             onProgress(
               progress,
               'Downloading: $receivedMB MB / $totalMB MB',
@@ -239,7 +240,7 @@ class ModelDownloadService {
           } else {
             onProgress(progress, 'Downloading: $receivedMB MB');
           }
-        } else if (update is TaskStatusUpdate && update.task.taskId == _currentTaskId) {
+        } else if (update is TaskStatusUpdate && update.task.taskId == task.taskId) {
           switch (update.status) {
             case TaskStatus.complete:
               onProgress(1.0, 'Download complete!');
@@ -272,47 +273,49 @@ class ModelDownloadService {
             if (modelInfo != null) {
               await selectModel(modelInfo);
             }
-            _currentTaskId = null;
+            _currentTask = null;
             return true;
           } else {
             onProgress(0, 'Error: Downloaded file is too small');
             file.deleteSync();
-            _currentTaskId = null;
+            _currentTask = null;
             return false;
           }
         }
       }
 
-      _currentTaskId = null;
+      _currentTask = null;
       return false;
     } catch (e) {
       debugPrint('Download error: $e');
       onProgress(0, 'Error: $e');
-      _currentTaskId = null;
+      _currentTask = null;
       return false;
     }
   }
 
   /// Cancel ongoing download
   Future<void> cancelDownload() async {
-    if (_currentTaskId != null) {
-      await FileDownloader().cancelTaskWithId(_currentTaskId!);
-      _currentTaskId = null;
+    if (_currentTask != null) {
+      await FileDownloader().cancelTaskWithId(_currentTask!.taskId);
+      _currentTask = null;
     }
   }
 
   /// Pause ongoing download
-  Future<void> pauseDownload() async {
-    if (_currentTaskId != null) {
-      await FileDownloader().pause(_currentTaskId!);
+  Future<bool> pauseDownload() async {
+    if (_currentTask != null) {
+      return await FileDownloader().pause(_currentTask!);
     }
+    return false;
   }
 
   /// Resume paused download
-  Future<void> resumeDownload() async {
-    if (_currentTaskId != null) {
-      await FileDownloader().resume(_currentTaskId!);
+  Future<bool> resumeDownload() async {
+    if (_currentTask != null) {
+      return await FileDownloader().resume(_currentTask!);
     }
+    return false;
   }
 
   /// Delete the model file

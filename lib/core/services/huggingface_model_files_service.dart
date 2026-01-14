@@ -173,6 +173,18 @@ class HuggingFaceModelFilesService {
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body) as List<dynamic>;
 
+        // Debug: print first ONNX file structure
+        if (path.contains('onnx') && data.isNotEmpty) {
+          final firstOnnx = data.firstWhere(
+            (item) => (item as Map<String, dynamic>)['path'].toString().endsWith('.onnx'),
+            orElse: () => null,
+          );
+          if (firstOnnx != null) {
+            debugPrint('📦 Sample ONNX file from API:');
+            debugPrint('   ${json.encode(firstOnnx)}');
+          }
+        }
+
         for (final item in data) {
           final file = HFModelFile.fromJson(item as Map<String, dynamic>);
 
