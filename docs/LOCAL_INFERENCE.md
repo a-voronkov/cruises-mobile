@@ -1,13 +1,15 @@
 # Local LLM Inference Guide
 
-This guide explains how to use local LLM inference in the Cruises Mobile app using llama.cpp.
+⚠️ **DEPRECATED**: This guide is outdated. The app now uses ONNX Runtime instead of llama.cpp.
+
+Please refer to [ONNX_INTEGRATION.md](./ONNX_INTEGRATION.md) for current implementation details.
 
 ## Overview
 
-The app now supports two inference modes:
+The app supports two inference modes:
 
 1. **Cloud Mode** (default) - Uses HuggingFace Inference API
-2. **Local Mode** - Uses llama.cpp for on-device inference
+2. **Local Mode** - Uses ONNX Runtime for on-device inference (requires additional implementation)
 
 ## Prerequisites
 

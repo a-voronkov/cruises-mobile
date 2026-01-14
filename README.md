@@ -54,8 +54,9 @@ Cruises Mobile is a Flutter-based mobile application that provides intelligent t
 | **State Management** | Riverpod 2.x |
 | **Local Storage** | Hive |
 | **Network** | Dio, HTTP |
-| **AI/ML** | HuggingFace Inference API |
-| **LLM Model** | Llama-3.2-1B-Instruct (via HF API) |
+| **AI/ML** | HuggingFace Inference API + ONNX Runtime |
+| **Cloud Model** | google/flan-t5-base (via HF API) |
+| **Local Inference** | ONNX Runtime (requires tokenizer implementation) |
 | **Error Tracking** | Bugsnag |
 | **Code Generation** | build_runner, freezed, json_serializable |
 | **Dependency Injection** | get_it, injectable |

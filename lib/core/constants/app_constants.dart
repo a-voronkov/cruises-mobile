@@ -12,8 +12,10 @@ class AppConstants {
   static const String modelName = 'FLAN-T5-Base';
   static const String modelVersion = 'HF-API';
 
-  // Legacy GGUF configuration (deprecated, kept for backwards compatibility)
-  static const String modelFileName = 'lfm2.5-1.2b-instruct-q4_k_m.gguf';
+  // Local ONNX model configuration
+  // Note: ONNX models require additional implementation for text generation
+  // (tokenizer, generation logic, decoding)
+  static const String modelFileName = 'model.onnx';
   static const int modelSizeBytes = 700000000; // ~700MB
   static const String modelLocalPath = 'models/$modelFileName';
 
