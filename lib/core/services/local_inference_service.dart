@@ -74,7 +74,7 @@ class LocalInferenceService {
 
       // Load model
       debugPrint('LocalInferenceService: Creating ONNX session...');
-      _session = OrtSession.fromFile(modelPath, sessionOptions);
+      _session = OrtSession.fromFile(modelFile, sessionOptions);
 
       onProgress?.call(0.7);
 
