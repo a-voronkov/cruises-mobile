@@ -7,8 +7,9 @@ class AppConstants {
   static const String appVersion = '1.0.0';
 
   // Model Configuration - HuggingFace API
-  static const String defaultModelId = 'meta-llama/Llama-3.2-1B-Instruct';
-  static const String modelName = 'Llama-3.2-1B-Instruct';
+  // Using Qwen2.5-Coder-0.5B-Instruct - small, fast, and supports Inference API
+  static const String defaultModelId = 'Qwen/Qwen2.5-Coder-0.5B-Instruct';
+  static const String modelName = 'Qwen2.5-Coder-0.5B-Instruct';
   static const String modelVersion = 'HF-API';
 
   // Legacy GGUF configuration (deprecated, kept for backwards compatibility)
