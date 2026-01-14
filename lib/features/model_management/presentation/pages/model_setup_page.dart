@@ -57,7 +57,7 @@ class _ModelSetupPageState extends ConsumerState<ModelSetupPage> {
       }
 
       // Brief delay for UX
-      await Future.delayed(const Duration(milliseconds: 500));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
 
       if (!mounted) return;
 

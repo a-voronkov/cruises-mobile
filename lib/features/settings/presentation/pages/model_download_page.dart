@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/huggingface_model_search_service.dart';
 import '../../../../core/services/huggingface_model_files_service.dart';
-import '../../../../core/services/model_download_service.dart';
 import '../../../../core/services/ai_service_provider.dart';
 import '../../../../core/models/model_info.dart';
 import '../../../../core/config/api_config.dart';
@@ -426,7 +425,7 @@ class _InfoRow extends StatelessWidget {
 class _QuantizationCard extends StatelessWidget {
   final String quantization;
   final List<HFModelFile> files;
-  final Function(HFModelFile) onDownload;
+  final void Function(HFModelFile) onDownload;
 
   const _QuantizationCard({
     required this.quantization,

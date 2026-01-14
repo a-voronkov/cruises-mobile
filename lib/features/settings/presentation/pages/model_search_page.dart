@@ -345,9 +345,9 @@ class _ModelTile extends ConsumerWidget {
 
   void _selectModel(BuildContext context, WidgetRef ref) {
     // Navigate to model download page
-    Navigator.push(
+    Navigator.push<void>(
       context,
-      MaterialPageRoute(
+      MaterialPageRoute<void>(
         builder: (_) => ModelDownloadPage(model: model),
       ),
     );

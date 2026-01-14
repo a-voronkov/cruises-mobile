@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../core/constants/app_constants.dart';
 import '../../../../core/providers/model_status_provider.dart';
 import '../../../../core/services/ai_service_provider.dart' show modelDownloadServiceProvider;
 import '../../../../main.dart';
@@ -149,9 +148,9 @@ class SettingsPage extends ConsumerWidget {
       subtitle: const Text('Search and select models from HuggingFace'),
       trailing: const Icon(Icons.chevron_right),
       onTap: () {
-        Navigator.push(
+        Navigator.push<void>(
           context,
-          MaterialPageRoute(builder: (_) => const ModelSearchPage()),
+          MaterialPageRoute<void>(builder: (_) => const ModelSearchPage()),
         );
       },
     );
