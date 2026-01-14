@@ -1,7 +1,7 @@
 name: cruises_mobile
 description: An autonomous travel planning assistant with embedded LLM for mobile platforms.
 publish_to: 'none'
-version: 0.0.13+73
+version: 0.0.13+74
 
 environment:
   sdk: '>=3.7.0 <4.0.0'

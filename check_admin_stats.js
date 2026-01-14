@@ -45,53 +45,55 @@ async function main() {
         const conflictsRes = await fetch(`${BASE_URL}/admin/unified-data/ship-itineraries/conflicts?limit=20&status=pending`);
         if (conflictsRes.ok) results.conflicts = await conflictsRes.json();
 
-        // 5. Verification: Trigger Consolidation and Check Details
-        console.log('Fetching a known merged cruise from log...');
-        const logRes = await fetch(`${BASE_URL}/admin/unified-data/merge-log?entityType=cruise&limit=1`);
-        if (logRes.ok) {
-            const logData = await logRes.json();
-            if (logData.logs && logData.logs.length > 0) {
-                const log = logData.logs[0];
-                const { masterId, sourceName, sourceEntityId } = log;
-                console.log(`Found merged cruise: MasterID=${masterId}, Source=${sourceName}, SourceID=${sourceEntityId}`);
+        // 5. Verification: Broad Sampling of Deployed Fix
+        console.log('--- Verifying Fix on Multiple Cruises ---');
+        // Fetch 5 random-ish cruises (using offset)
+        const offset = Math.floor(Math.random() * 50);
+        const searchRes = await fetch(`${BASE_URL}/cruises/search?limit=5&offset=${offset}`);
+        
+        if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            const cruises = searchData.cruises || [];
+            console.log(`Checking ${cruises.length} cruises for itinerary integrity...`);
 
-                // Trigger consolidation
-                console.log('Triggering manual consolidation...');
-                const processRes = await fetch(`${BASE_URL}/admin/unified-data/cruises/process`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ scraper: sourceName, cruiseId: sourceEntityId })
-                });
+            results.verificationSamples = [];
 
-                if (processRes.ok) {
-                    const processResult = await processRes.json();
-                    console.log('Consolidation result:', JSON.stringify(processResult));
-
-                    // Check details
-                    console.log(`Fetching details for Cruise ID: ${masterId}...`);
-                    const detailsRes = await fetch(`${BASE_URL}/cruises/${masterId}`);
-                    if (detailsRes.ok) {
-                        const cruiseDetails = await detailsRes.json();
-                        results.verificationDetails = {
-                            cruiseId: cruiseDetails.id,
-                            shipName: cruiseDetails.ship?.name,
-                            itineraryCount: cruiseDetails.itineraries?.length || 0,
-                            itinerariesSample: cruiseDetails.itineraries?.slice(0, 5)
-                        };
-                        console.log(`Cruise ${masterId} Itineraries: ${results.verificationDetails.itineraryCount}`);
-                    } else {
-                         console.error('Failed to fetch cruise details:', detailsRes.statusText);
+            for (const c of cruises) {
+                console.log(`Checking Cruise ${c.id} (${c.ship?.name})...`);
+                const detailsRes = await fetch(`${BASE_URL}/cruises/${c.id}`);
+                if (detailsRes.ok) {
+                    const details = await detailsRes.json();
+                    const itineraries = details.itineraries || [];
+                    
+                    // Check for duplicates (same date, different port)
+                    const dateMap = new Map();
+                    let duplicatesFound = false;
+                    for (const it of itineraries) {
+                        const dateKey = it.date.split('T')[0]; // Simple date part
+                        if (dateMap.has(dateKey)) {
+                            duplicatesFound = true;
+                            break;
+                        }
+                        dateMap.set(dateKey, it.portId);
                     }
+
+                    const sampleResult = {
+                        cruiseId: c.id,
+                        shipName: c.ship?.name,
+                        itineraryCount: itineraries.length,
+                        hasItineraries: itineraries.length > 0,
+                        hasDuplicates: duplicatesFound
+                    };
+                    results.verificationSamples.push(sampleResult);
+                    console.log(`  -> Itineraries: ${itineraries.length}, Duplicates: ${duplicatesFound ? 'YES' : 'No'}`);
                 } else {
-                    console.error('Failed to trigger consolidation:', processRes.statusText);
+                    console.error(`  -> Failed to fetch details: ${detailsRes.statusText}`);
                 }
-            } else {
-                console.log('No merge logs found.');
             }
         } else {
-            console.error('Failed to fetch merge log:', logRes.statusText);
+            console.error('Failed to search cruises:', searchRes.statusText);
         }
-        
+
         // Write to file
         fs.writeFileSync('admin_stats.json', JSON.stringify(results, null, 2));
         console.log('Stats saved to admin_stats.json');

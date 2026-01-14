@@ -103,7 +103,7 @@ class LocalInferenceService {
     double temperature = 0.7,
     double topP = 0.9,
   }) async {
-    if (!_isInitialized || _model == null) {
+    if (!_isInitialized) {
       throw StateError('LocalInferenceService not initialized');
     }
 
@@ -134,7 +134,7 @@ class LocalInferenceService {
     double temperature = 0.7,
     double topP = 0.9,
   }) async* {
-    if (!_isInitialized || _model == null) {
+    if (!_isInitialized) {
       throw StateError('LocalInferenceService not initialized');
     }
 
@@ -145,8 +145,9 @@ class LocalInferenceService {
 
   /// Dispose the service and free resources
   void dispose() {
-    _model?.dispose();
-    _model = null;
+    // TODO: Implement ONNX model disposal
+    // _model?.dispose();
+    // _model = null;
     _isInitialized = false;
     _currentModelPath = null;
     debugPrint('LocalInferenceService: Disposed');
