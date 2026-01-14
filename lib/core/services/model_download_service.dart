@@ -6,10 +6,12 @@ import 'package:background_downloader/background_downloader.dart';
 import '../constants/app_constants.dart';
 import '../models/model_info.dart';
 import 'hive_service.dart';
+import 'ai_service.dart';
 
 /// Service for downloading and managing the LLM model file
 class ModelDownloadService {
   final Dio _dio;
+  final AIService? _aiService;
   DownloadTask? _currentTask;
 
   /// Currently selected model filename (null = default from AppConstants)
@@ -18,7 +20,9 @@ class ModelDownloadService {
   /// Currently selected model info (persisted in Hive settings box)
   ModelInfo? _selectedModel;
 
-  ModelDownloadService({Dio? dio}) : _dio = dio ?? Dio() {
+  ModelDownloadService({Dio? dio, AIService? aiService})
+      : _dio = dio ?? Dio(),
+        _aiService = aiService {
     _loadSelectedModelFromStorage();
     _initializeBackgroundDownloader();
   }
@@ -65,13 +69,33 @@ class ModelDownloadService {
   /// Get the currently selected model (if stored)
   ModelInfo? get selectedModel => _selectedModel;
 
-  /// Set the selected model
+  /// Set the selected model and switch AI service to use it
   Future<void> selectModel(ModelInfo model) async {
     _selectedModel = model;
     _selectedModelFileName = model.fileName;
 
     try {
       await HiveService.settingsBox.put(AppConstants.modelStorageKey, model.toJson());
+
+      // Switch AI service to this model if available
+      if (_aiService != null && model.huggingFaceRepo != null) {
+        debugPrint('ModelDownloadService: Switching AI service to model: ${model.huggingFaceRepo}');
+
+        // For ONNX models, we need to provide the downloaded file name
+        final success = await _aiService!.switchToModel(
+          modelId: model.huggingFaceRepo!,
+          modelFileName: model.fileName,
+          onProgress: (progress) {
+            debugPrint('Model switch progress: ${(progress * 100).toStringAsFixed(0)}%');
+          },
+        );
+
+        if (success) {
+          debugPrint('ModelDownloadService: Successfully switched to ${model.huggingFaceRepo}');
+        } else {
+          debugPrint('ModelDownloadService: Failed to switch to ${model.huggingFaceRepo}');
+        }
+      }
     } catch (e) {
       debugPrint('ModelDownloadService: failed to persist selected model: $e');
     }

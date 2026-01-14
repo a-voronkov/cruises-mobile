@@ -34,12 +34,91 @@ class AIService {
   /// Check if using local inference
   bool get isLocal => _mode == InferenceMode.local;
 
+  /// Check if a model ID represents an ONNX model (requires local inference)
+  bool _isOnnxModel(String modelId) {
+    return modelId.toLowerCase().contains('onnx');
+  }
+
   /// Set the model ID to use for generation
   ///
   /// This allows changing the model without reinitializing the service
-  void setModelId(String modelId) {
+  Future<void> setModelId(String modelId) async {
     _currentModelId = modelId;
+
+    // Save to preferences
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('selected_model_id', modelId);
+    } catch (e) {
+      debugPrint('AIService: Failed to save model ID: $e');
+    }
+
     debugPrint('AIService: Model changed to: $modelId');
+  }
+
+  /// Switch to a specific model, automatically choosing the right inference mode
+  ///
+  /// [modelId] - Model ID (e.g., "meta-llama/Llama-3.2-1B-Instruct" or "onnx-community/Llama-3.2-1B-Instruct-ONNX")
+  /// [modelFileName] - For ONNX models, the downloaded file name (e.g., "model_uint8.onnx")
+  /// [onProgress] - Callback for initialization progress (0.0 to 1.0)
+  ///
+  /// Returns true if switch was successful
+  Future<bool> switchToModel({
+    required String modelId,
+    String? modelFileName,
+    void Function(double progress)? onProgress,
+  }) async {
+    try {
+      debugPrint('AIService: Switching to model: $modelId');
+
+      // Determine if this is an ONNX model
+      final isOnnx = _isOnnxModel(modelId);
+
+      if (isOnnx) {
+        // ONNX model - use local inference
+        if (modelFileName == null) {
+          debugPrint('AIService: ONNX model requires modelFileName parameter');
+          return false;
+        }
+
+        debugPrint('AIService: Initializing local inference with file: $modelFileName');
+
+        // Dispose current services
+        _hfService?.dispose();
+        _hfService = null;
+        _localService?.dispose();
+        _localService = null;
+        _isInitialized = false;
+
+        // Initialize local service
+        final success = await initializeLocal(
+          modelFileName: modelFileName,
+          onProgress: onProgress,
+        );
+
+        if (success) {
+          await setModelId(modelId);
+        }
+
+        return success;
+      } else {
+        // Cloud model - use HuggingFace API
+        debugPrint('AIService: Using cloud inference');
+
+        // Just update the model ID if already in cloud mode
+        if (_mode == InferenceMode.cloud && _isInitialized) {
+          await setModelId(modelId);
+          return true;
+        }
+
+        // Otherwise need to reinitialize (shouldn't happen in normal flow)
+        debugPrint('AIService: Warning - cloud service not initialized');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('AIService: Failed to switch model: $e');
+      return false;
+    }
   }
 
   /// Initialize the AI service for cloud inference

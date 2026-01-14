@@ -1,9 +1,13 @@
 import 'package:bugsnag_flutter/bugsnag_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'ai_service.dart';
 import 'model_download_service.dart';
+import 'hive_service.dart';
 import '../config/api_config.dart';
+import '../constants/app_constants.dart';
+import '../models/model_info.dart';
 
 /// Provider for AIService singleton
 final aiServiceProvider = Provider<AIService>((ref) {
@@ -12,7 +16,8 @@ final aiServiceProvider = Provider<AIService>((ref) {
 
 /// Provider for ModelDownloadService singleton (shared with settings)
 final modelDownloadServiceProvider = Provider<ModelDownloadService>((ref) {
-  return ModelDownloadService();
+  final aiService = ref.read(aiServiceProvider);
+  return ModelDownloadService(aiService: aiService);
 });
 
 /// Provider that initializes AI service on app start
@@ -40,15 +45,44 @@ final aiServiceInitializerProvider = FutureProvider<bool>((ref) async {
       apiKey: ApiConfig.huggingFaceApiKey,
     );
 
-    if (success) {
-      debugPrint('✅ AIService initialized successfully');
-    } else {
+    if (!success) {
       const error = 'AIService initialization returned false';
       debugPrint('❌ $error');
       await bugsnag.notify(Exception(error), null);
+      return false;
     }
 
-    return success;
+    debugPrint('✅ AIService initialized successfully (cloud mode)');
+
+    // Check if there's a saved ONNX model to switch to
+    try {
+      final modelJson = HiveService.settingsBox.get(AppConstants.modelStorageKey);
+      if (modelJson != null) {
+        final model = ModelInfo.fromJson(Map<String, dynamic>.from(modelJson as Map));
+        debugPrint('Found saved model: ${model.huggingFaceRepo} (${model.format.name})');
+
+        if (model.format == ModelFormat.onnx && model.huggingFaceRepo != null) {
+          debugPrint('Switching to saved ONNX model...');
+          final switchSuccess = await aiService.switchToModel(
+            modelId: model.huggingFaceRepo!,
+            modelFileName: model.fileName,
+          );
+
+          if (switchSuccess) {
+            debugPrint('✅ Switched to ONNX model: ${model.huggingFaceRepo}');
+          } else {
+            debugPrint('⚠️ Failed to switch to ONNX model, staying in cloud mode');
+          }
+        } else {
+          debugPrint('Saved model is not ONNX, staying in cloud mode');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error checking saved model: $e');
+      // Continue with cloud mode
+    }
+
+    return true;
   } catch (e, stackTrace) {
     debugPrint('❌ Exception during AI service initialization: $e');
     debugPrint('Stack trace: $stackTrace');
