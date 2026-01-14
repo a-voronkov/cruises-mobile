@@ -2,16 +2,22 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'huggingface_inference_service.dart';
+import 'local_inference_service.dart';
 import '../constants/app_constants.dart';
 
+enum InferenceMode {
+  cloud, // HuggingFace Inference API
+  local, // Local llama.cpp inference
+}
+
 /// Service for AI text generation
-/// 
+///
 /// This service provides a unified interface for text generation,
-/// currently using HuggingFace Inference API.
-/// 
-/// Replaces the old LlamaService which used local llama.cpp inference.
+/// supporting both cloud (HuggingFace) and local (llama.cpp) inference.
 class AIService {
   HuggingFaceInferenceService? _hfService;
+  LocalInferenceService? _localService;
+  InferenceMode _mode = InferenceMode.cloud;
   bool _isInitialized = false;
   bool _isDisposed = false;
   String? _currentModelId;
@@ -22,6 +28,12 @@ class AIService {
   /// Get the current model ID
   String? get modelId => _currentModelId;
 
+  /// Get the current inference mode
+  InferenceMode get mode => _mode;
+
+  /// Check if using local inference
+  bool get isLocal => _mode == InferenceMode.local;
+
   /// Set the model ID to use for generation
   ///
   /// This allows changing the model without reinitializing the service
@@ -30,12 +42,12 @@ class AIService {
     debugPrint('AIService: Model changed to: $modelId');
   }
 
-  /// Initialize the AI service
-  /// 
+  /// Initialize the AI service for cloud inference
+  ///
   /// [apiKey] - HuggingFace API key (required)
   /// [modelId] - Model ID to use (optional, uses default from constants)
   /// [onProgress] - Callback for initialization progress (0.0 to 1.0)
-  /// 
+  ///
   /// Returns true if initialization was successful
   Future<bool> initialize({
     required String apiKey,
@@ -43,8 +55,8 @@ class AIService {
     void Function(double progress)? onProgress,
   }) async {
     try {
-      if (_isInitialized && !_isDisposed) {
-        debugPrint('AIService: Already initialized');
+      if (_isInitialized && !_isDisposed && _mode == InferenceMode.cloud) {
+        debugPrint('AIService: Already initialized (cloud mode)');
         return true;
       }
 
@@ -63,6 +75,7 @@ class AIService {
 
       // Initialize HuggingFace service
       _hfService = HuggingFaceInferenceService(apiKey: apiKey);
+      _mode = InferenceMode.cloud;
 
       // Load saved model ID or use provided/default
       if (modelId != null) {
@@ -74,26 +87,74 @@ class AIService {
 
       onProgress?.call(0.7);
 
-      debugPrint('AIService: Initialized with model: $_currentModelId');
+      debugPrint('AIService: Initialized with cloud model: $_currentModelId');
 
       _isInitialized = true;
       onProgress?.call(1.0);
 
       return true;
     } catch (e) {
-      debugPrint('AIService: Initialization failed: $e');
+      debugPrint('AIService: Cloud initialization failed: $e');
       _isInitialized = false;
       return false;
     }
   }
 
+  /// Initialize the AI service for local inference
+  ///
+  /// [modelFileName] - Name of the GGUF model file in the models directory
+  /// [onProgress] - Callback for initialization progress (0.0 to 1.0)
+  ///
+  /// Returns true if initialization was successful
+  Future<bool> initializeLocal({
+    required String modelFileName,
+    void Function(double progress)? onProgress,
+  }) async {
+    try {
+      if (_isInitialized && !_isDisposed && _mode == InferenceMode.local) {
+        debugPrint('AIService: Already initialized (local mode)');
+        return true;
+      }
+
+      // Reset disposed flag if reinitializing
+      _isDisposed = false;
+
+      onProgress?.call(0.1);
+
+      // Initialize local service
+      _localService = LocalInferenceService();
+      final success = await _localService!.initialize(
+        modelFileName: modelFileName,
+        onProgress: onProgress,
+      );
+
+      if (!success) {
+        debugPrint('AIService: Local service initialization failed');
+        _localService = null;
+        return false;
+      }
+
+      _mode = InferenceMode.local;
+      _currentModelId = modelFileName;
+      _isInitialized = true;
+
+      debugPrint('AIService: Initialized with local model: $modelFileName');
+      return true;
+    } catch (e) {
+      debugPrint('AIService: Local initialization failed: $e');
+      _isInitialized = false;
+      _localService = null;
+      return false;
+    }
+  }
+
   /// Generate text completion
-  /// 
+  ///
   /// [prompt] - Input prompt
   /// [maxTokens] - Maximum number of tokens to generate
   /// [temperature] - Sampling temperature (0.0 to 1.0)
   /// [topP] - Nucleus sampling parameter
-  /// 
+  ///
   /// Returns generated text
   Future<String> generate({
     required String prompt,
@@ -105,20 +166,29 @@ class AIService {
       throw StateError('AIService not initialized');
     }
 
-    if (_hfService == null || _currentModelId == null) {
-      throw StateError('HuggingFace service not configured');
-    }
-
     try {
-      final result = await _hfService!.generate(
-        modelId: _currentModelId!,
-        prompt: prompt,
-        maxTokens: maxTokens ?? AppConstants.maxTokens,
-        temperature: temperature ?? AppConstants.temperature,
-        topP: topP ?? AppConstants.topP,
-      );
-
-      return result;
+      if (_mode == InferenceMode.local) {
+        if (_localService == null) {
+          throw StateError('Local service not configured');
+        }
+        return await _localService!.generate(
+          prompt: prompt,
+          maxTokens: maxTokens ?? AppConstants.maxTokens,
+          temperature: temperature ?? AppConstants.temperature,
+          topP: topP ?? AppConstants.topP,
+        );
+      } else {
+        if (_hfService == null || _currentModelId == null) {
+          throw StateError('HuggingFace service not configured');
+        }
+        return await _hfService!.generate(
+          modelId: _currentModelId!,
+          prompt: prompt,
+          maxTokens: maxTokens ?? AppConstants.maxTokens,
+          temperature: temperature ?? AppConstants.temperature,
+          topP: topP ?? AppConstants.topP,
+        );
+      }
     } catch (e) {
       debugPrint('AIService: Generation failed: $e');
       rethrow;
@@ -143,21 +213,32 @@ class AIService {
       throw StateError('AIService not initialized');
     }
 
-    if (_hfService == null || _currentModelId == null) {
-      throw StateError('HuggingFace service not configured');
-    }
-
     try {
       // Convert messages to prompt format
       final prompt = _formatMessagesToPrompt(messages);
 
-      yield* _hfService!.generateStream(
-        modelId: _currentModelId!,
-        prompt: prompt,
-        maxTokens: maxTokens ?? AppConstants.maxTokens,
-        temperature: temperature ?? AppConstants.temperature,
-        topP: topP ?? AppConstants.topP,
-      );
+      if (_mode == InferenceMode.local) {
+        if (_localService == null) {
+          throw StateError('Local service not configured');
+        }
+        yield* _localService!.generateStream(
+          prompt: prompt,
+          maxTokens: maxTokens ?? AppConstants.maxTokens,
+          temperature: temperature ?? AppConstants.temperature,
+          topP: topP ?? AppConstants.topP,
+        );
+      } else {
+        if (_hfService == null || _currentModelId == null) {
+          throw StateError('HuggingFace service not configured');
+        }
+        yield* _hfService!.generateStream(
+          modelId: _currentModelId!,
+          prompt: prompt,
+          maxTokens: maxTokens ?? AppConstants.maxTokens,
+          temperature: temperature ?? AppConstants.temperature,
+          topP: topP ?? AppConstants.topP,
+        );
+      }
     } catch (e) {
       debugPrint('AIService: Stream generation failed: $e');
       rethrow;
@@ -192,6 +273,8 @@ class AIService {
     debugPrint('AIService: Disposing...');
     _hfService?.dispose();
     _hfService = null;
+    _localService?.dispose();
+    _localService = null;
     _isInitialized = false;
     _isDisposed = true;
     debugPrint('AIService: Disposed');
