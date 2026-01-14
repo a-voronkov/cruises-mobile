@@ -169,9 +169,18 @@ class ModelDownloadService {
     final file = File(modelPath);
     if (!file.existsSync()) return false;
 
-    // Check file size is reasonable (> 100MB for a valid model)
+    // Check file size is reasonable (> 100MB for a valid model file)
+    // Skip size check for small files like tokenizer configs
     final fileSize = file.lengthSync();
-    return fileSize > 100 * 1024 * 1024;
+    final fileName = file.path.toLowerCase();
+
+    // Only check size for actual model files (.onnx, .gguf)
+    if (fileName.endsWith('.onnx') || fileName.endsWith('.gguf')) {
+      return fileSize > 100 * 1024 * 1024;
+    }
+
+    // For other files (tokenizer, configs), just check they exist and have content
+    return fileSize > 0;
   }
 
   /// Check if a specific model is downloaded
@@ -183,7 +192,15 @@ class ModelDownloadService {
     if (!file.existsSync()) return false;
 
     final fileSize = file.lengthSync();
-    return fileSize > 100 * 1024 * 1024;
+    final fileNameLower = fileName.toLowerCase();
+
+    // Only check size for actual model files (.onnx, .gguf)
+    if (fileNameLower.endsWith('.onnx') || fileNameLower.endsWith('.gguf')) {
+      return fileSize > 100 * 1024 * 1024;
+    }
+
+    // For other files (tokenizer, configs), just check they exist and have content
+    return fileSize > 0;
   }
 
   /// Get the local path where the model should be stored
@@ -347,9 +364,25 @@ class ModelDownloadService {
         final file = File(modelPath);
         if (file.existsSync()) {
           final fileSize = file.lengthSync();
-          if (fileSize > 100 * 1024 * 1024) {
-            // Update selected model on successful download
-            if (modelInfo != null) {
+          final fileNameLower = fileName.toLowerCase();
+
+          // Check file size based on file type
+          bool isValidSize = false;
+          if (fileNameLower.endsWith('.onnx') || fileNameLower.endsWith('.gguf')) {
+            // Model files should be > 100MB
+            isValidSize = fileSize > 100 * 1024 * 1024;
+            if (!isValidSize) {
+              debugPrint('Model file too small: ${fileSize / 1024 / 1024} MB');
+            }
+          } else {
+            // Tokenizer and config files just need to have content
+            isValidSize = fileSize > 0;
+            debugPrint('Small file detected (${fileSize} bytes): $fileName - this is OK for tokenizer/config files');
+          }
+
+          if (isValidSize) {
+            // Update selected model on successful download (only for main model files)
+            if (modelInfo != null && (fileNameLower.endsWith('.onnx') || fileNameLower.endsWith('.gguf'))) {
               await selectModel(modelInfo);
             }
             _currentTask = null;
