@@ -367,21 +367,40 @@ class HuggingFaceModelFilesService {
         final metaResponse = await _client.send(metaRequest);
         debugPrint('  Metadata response: ${metaResponse.statusCode}');
 
+        // Check for X-Linked-Size in the redirect response
+        final linkedSize = metaResponse.headers['x-linked-size'];
+        if (linkedSize != null) {
+          final size = int.tryParse(linkedSize);
+          if (size != null && size > 0) {
+            file.size = size;
+            debugPrint('✓ Fetched size via X-Linked-Size (redirect) for ${file.path}: ${file.formattedSize}');
+            return;
+          }
+        }
+
         if (metaResponse.statusCode == 302 || metaResponse.statusCode == 301) {
           // Follow redirect manually to get final URL
           final location = metaResponse.headers['location'];
           if (location != null) {
-            debugPrint('  Redirect to: $location');
+            debugPrint('  Redirect to: ${location.substring(0, location.length > 200 ? 200 : location.length)}...');
             final finalUri = Uri.parse(location);
             final finalRequest = http.Request('HEAD', finalUri);
             final finalResponse = await _client.send(finalRequest);
 
             debugPrint('  Final response: ${finalResponse.statusCode}');
-            final contentLength = finalResponse.headers['content-length'];
-            debugPrint('  Final Content-Length: $contentLength');
 
-            if (contentLength != null) {
-              final size = int.tryParse(contentLength);
+            // Check all size-related headers
+            debugPrint('  Headers: ${finalResponse.headers.keys.join(", ")}');
+            final contentLength = finalResponse.headers['content-length'];
+            final xLinkedSize = finalResponse.headers['x-linked-size'];
+
+            debugPrint('  Content-Length: $contentLength');
+            debugPrint('  X-Linked-Size: $xLinkedSize');
+
+            // Prefer X-Linked-Size over Content-Length
+            final sizeStr = xLinkedSize ?? contentLength;
+            if (sizeStr != null) {
+              final size = int.tryParse(sizeStr);
               if (size != null && size > 0) {
                 file.size = size;
                 debugPrint('✓ Fetched size via redirect for ${file.path}: ${file.formattedSize}');
