@@ -1,7 +1,7 @@
 name: cruises_mobile
 description: An autonomous travel planning assistant with embedded LLM for mobile platforms.
 publish_to: 'none'
-version: 0.0.13+60
+version: 0.0.13+61
 
 environment:
   sdk: '>=3.7.0 <4.0.0'
@@ -25,6 +25,7 @@ dependencies:
 
   # Network
   dio: ^5.9.0
+  background_downloader: ^8.10.3
 
   # UI Components
   flutter_markdown_plus: ^1.0.7

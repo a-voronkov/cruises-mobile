@@ -19,9 +19,33 @@ class HFModelFile {
   }) : relatedFiles = relatedFiles ?? [];
 
   factory HFModelFile.fromJson(Map<String, dynamic> json) {
+    // Try to get real size from lfs field (for Git LFS files)
+    int size = (json['size'] as num?)?.toInt() ?? 0;
+
+    // Debug: print raw JSON for ONNX files to see what we're getting
+    final path = json['path'] as String;
+    if (path.endsWith('.onnx')) {
+      debugPrint('📦 Parsing file: $path');
+      debugPrint('   Raw size: $size bytes');
+      debugPrint('   Has lfs field: ${json['lfs'] != null}');
+      if (json['lfs'] != null) {
+        debugPrint('   LFS data: ${json['lfs']}');
+      }
+    }
+
+    // Check if this is a Git LFS file with real size info
+    if (json['lfs'] != null && json['lfs'] is Map) {
+      final lfs = json['lfs'] as Map<String, dynamic>;
+      final lfsSize = (lfs['size'] as num?)?.toInt();
+      if (lfsSize != null && lfsSize > 0) {
+        size = lfsSize;
+        debugPrint('   ✓ Using LFS size: $size bytes');
+      }
+    }
+
     return HFModelFile(
-      path: json['path'] as String,
-      size: (json['size'] as num?)?.toInt() ?? 0,
+      path: path,
+      size: size,
       oid: json['oid'] as String?,
       type: json['type'] as String? ?? 'file',
     );
@@ -252,8 +276,11 @@ class HuggingFaceModelFilesService {
   /// Fetch real file size using HEAD request with redirect following
   Future<void> _fetchRealSize(String repoId, HFModelFile file) async {
     try {
-      // If size is already known and non-zero, skip
-      if (file.size > 0) {
+      // For ONNX/GGUF files, the size from API is often just the Git LFS pointer size
+      // We need to fetch the real size via HEAD request
+      // Skip only if size is already large (> 10 MB), indicating it's the real file size
+      const minModelSize = 10 * 1024 * 1024; // 10 MB
+      if (file.size > minModelSize) {
         debugPrint('✓ Size already known for ${file.path}: ${file.formattedSize}');
         return;
       }
@@ -277,23 +304,40 @@ class HuggingFaceModelFilesService {
         final streamedResponse = await _client.send(request);
 
         debugPrint('  HEAD response: ${streamedResponse.statusCode}');
-        debugPrint('  Headers: ${streamedResponse.headers}');
 
         if (streamedResponse.statusCode == 200) {
-          final contentLength = streamedResponse.headers['content-length'];
-          debugPrint('  Content-Length: $contentLength');
+          // For Git LFS files, HuggingFace returns X-Linked-Size header with real file size
+          final linkedSize = streamedResponse.headers['x-linked-size'];
+          if (linkedSize != null) {
+            final size = int.tryParse(linkedSize);
+            if (size != null && size > 0) {
+              file.size = size;
+              debugPrint('✓ Fetched size via X-Linked-Size for ${file.path}: ${file.formattedSize} ($size bytes)');
+              return;
+            }
+          }
 
+          // Check Content-Length
+          final contentLength = streamedResponse.headers['content-length'];
           if (contentLength != null) {
             final size = int.tryParse(contentLength);
             if (size != null && size > 0) {
-              file.size = size;
-              debugPrint('✓ Fetched size for ${file.path}: ${file.formattedSize} ($size bytes)');
-              return;
-            } else {
-              debugPrint('  ⚠ Invalid size: $contentLength');
+              // If size is suspiciously small for a model file (< 1 MB), it's likely a Git LFS pointer
+              // Try the fallback method to get the real size
+              const minRealFileSize = 1024 * 1024; // 1 MB
+              if (size < minRealFileSize && (file.isONNX || file.isGGUF)) {
+                debugPrint('  ⚠ Size too small ($size bytes), likely LFS pointer - trying fallback...');
+                // Don't return, fall through to fallback method
+              } else {
+                file.size = size;
+                debugPrint('✓ Fetched size via Content-Length for ${file.path}: ${file.formattedSize} ($size bytes)');
+                return;
+              }
             }
-          } else {
-            debugPrint('  ⚠ No Content-Length header');
+          }
+
+          if (linkedSize == null && contentLength == null) {
+            debugPrint('  ⚠ No size headers found (X-Linked-Size or Content-Length)');
           }
         }
       } catch (e) {

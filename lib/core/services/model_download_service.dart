@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:background_downloader/background_downloader.dart';
 import '../constants/app_constants.dart';
 import '../models/model_info.dart';
 import 'hive_service.dart';
@@ -9,7 +10,7 @@ import 'hive_service.dart';
 /// Service for downloading and managing the LLM model file
 class ModelDownloadService {
   final Dio _dio;
-  CancelToken? _cancelToken;
+  String? _currentTaskId;
 
   /// Currently selected model filename (null = default from AppConstants)
   String? _selectedModelFileName;
@@ -19,6 +20,27 @@ class ModelDownloadService {
 
   ModelDownloadService({Dio? dio}) : _dio = dio ?? Dio() {
     _loadSelectedModelFromStorage();
+    _initializeBackgroundDownloader();
+  }
+
+  /// Initialize background downloader
+  Future<void> _initializeBackgroundDownloader() async {
+    await FileDownloader().configure(
+      globalConfig: [
+        (Config.requestTimeout, const Duration(hours: 24)),
+        (Config.holdingQueue, (maxConcurrent: 1, maxWaitingTasks: 10)),
+      ],
+      androidConfig: [
+        (Config.useCacheDir, Config.whenAble),
+        (Config.runInForeground, Config.always),
+        (Config.checkAvailableSpace, Config.always),
+      ],
+      iOSConfig: [
+        (Config.localize, {'Cancel': 'Cancel', 'Pause': 'Pause', 'Resume': 'Resume'}),
+      ],
+    );
+
+    debugPrint('Background downloader initialized');
   }
 
   void _loadSelectedModelFromStorage() {
@@ -177,73 +199,120 @@ class ModelDownloadService {
       // Build download URL - use custom URL if provided, otherwise use default server
       final downloadUrl = modelInfo?.downloadUrl ?? '${AppConstants.modelServerBaseUrl}/$fileName';
 
-      // Create a new cancel token for this download
-      _cancelToken = CancelToken();
-
       onProgress(0, 'Starting download...');
 
-      // Download the model file
-      await _dio.download(
-        downloadUrl,
-        modelPath,
-        cancelToken: _cancelToken,
-        onReceiveProgress: (received, total) {
-          if (total != -1) {
-            final progress = received / total;
-            final receivedMB = (received / (1024 * 1024)).toStringAsFixed(1);
-            final totalMB = (total / (1024 * 1024)).toStringAsFixed(1);
+      // Get directory for download
+      final directory = await getApplicationDocumentsDirectory();
+      final modelsDir = Directory('${directory.path}/models');
+      if (!modelsDir.existsSync()) {
+        modelsDir.createSync(recursive: true);
+      }
+
+      // Create download task
+      final task = DownloadTask(
+        url: downloadUrl,
+        filename: fileName,
+        directory: 'models',
+        baseDirectory: BaseDirectory.applicationDocuments,
+        updates: Updates.statusAndProgress,
+        requiresWiFi: false,
+        retries: 3,
+        allowPause: true,
+        metaData: modelInfo?.id ?? fileName,
+      );
+
+      // Store task ID
+      _currentTaskId = task.taskId;
+
+      // Listen to progress updates
+      FileDownloader().updates.listen((update) {
+        if (update is TaskProgressUpdate && update.task.taskId == _currentTaskId) {
+          final progress = update.progress;
+          final receivedMB = ((update.task.fileSize ?? 0) * progress / (1024 * 1024)).toStringAsFixed(1);
+          final totalMB = ((update.task.fileSize ?? 0) / (1024 * 1024)).toStringAsFixed(1);
+
+          if (update.task.fileSize != null && update.task.fileSize! > 0) {
             onProgress(
               progress,
               'Downloading: $receivedMB MB / $totalMB MB',
             );
           } else {
-            final receivedMB = (received / (1024 * 1024)).toStringAsFixed(1);
-            onProgress(0.5, 'Downloading: $receivedMB MB');
+            onProgress(progress, 'Downloading: $receivedMB MB');
           }
-        },
-        options: Options(
-          receiveTimeout: const Duration(minutes: 30),
-          sendTimeout: const Duration(seconds: 30),
-        ),
-      );
+        } else if (update is TaskStatusUpdate && update.task.taskId == _currentTaskId) {
+          switch (update.status) {
+            case TaskStatus.complete:
+              onProgress(1.0, 'Download complete!');
+              break;
+            case TaskStatus.failed:
+              onProgress(0, 'Download failed');
+              break;
+            case TaskStatus.canceled:
+              onProgress(0, 'Download cancelled');
+              break;
+            case TaskStatus.paused:
+              onProgress(0, 'Download paused');
+              break;
+            default:
+              break;
+          }
+        }
+      });
+
+      // Start download
+      final result = await FileDownloader().download(task);
 
       // Verify download
-      final file = File(modelPath);
-      if (file.existsSync()) {
-        final fileSize = file.lengthSync();
-        if (fileSize > 100 * 1024 * 1024) {
-          // Update selected model on successful download
-          if (modelInfo != null) {
-            await selectModel(modelInfo);
+      if (result.status == TaskStatus.complete) {
+        final file = File(modelPath);
+        if (file.existsSync()) {
+          final fileSize = file.lengthSync();
+          if (fileSize > 100 * 1024 * 1024) {
+            // Update selected model on successful download
+            if (modelInfo != null) {
+              await selectModel(modelInfo);
+            }
+            _currentTaskId = null;
+            return true;
+          } else {
+            onProgress(0, 'Error: Downloaded file is too small');
+            file.deleteSync();
+            _currentTaskId = null;
+            return false;
           }
-          onProgress(1.0, 'Download complete!');
-          return true;
-        } else {
-          onProgress(0, 'Error: Downloaded file is too small');
-          file.deleteSync();
-          return false;
         }
       }
 
-      onProgress(0, 'Error: File not found after download');
-      return false;
-    } on DioException catch (e) {
-      if (e.type == DioExceptionType.cancel) {
-        onProgress(0, 'Download cancelled');
-      } else {
-        onProgress(0, 'Download error: ${e.message}');
-      }
+      _currentTaskId = null;
       return false;
     } catch (e) {
+      debugPrint('Download error: $e');
       onProgress(0, 'Error: $e');
+      _currentTaskId = null;
       return false;
     }
   }
 
   /// Cancel ongoing download
-  void cancelDownload() {
-    _cancelToken?.cancel('User cancelled download');
-    _cancelToken = null;
+  Future<void> cancelDownload() async {
+    if (_currentTaskId != null) {
+      await FileDownloader().cancelTaskWithId(_currentTaskId!);
+      _currentTaskId = null;
+    }
+  }
+
+  /// Pause ongoing download
+  Future<void> pauseDownload() async {
+    if (_currentTaskId != null) {
+      await FileDownloader().pause(_currentTaskId!);
+    }
+  }
+
+  /// Resume paused download
+  Future<void> resumeDownload() async {
+    if (_currentTaskId != null) {
+      await FileDownloader().resume(_currentTaskId!);
+    }
   }
 
   /// Delete the model file
