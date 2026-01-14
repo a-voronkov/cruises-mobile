@@ -37,7 +37,10 @@ final aiServiceInitializerProvider = FutureProvider<bool>((ref) async {
 
       // Try to find any downloaded ONNX models
       final directory = await getApplicationDocumentsDirectory();
+      debugPrint('App documents directory: ${directory.path}');
       final modelsDir = Directory('${directory.path}/models');
+      debugPrint('Models directory path: ${modelsDir.path}');
+      debugPrint('Models directory exists: ${modelsDir.existsSync()}');
 
       if (modelsDir.existsSync()) {
         final files = modelsDir
@@ -73,10 +76,12 @@ final aiServiceInitializerProvider = FutureProvider<bool>((ref) async {
           debugPrint('✅ Model info recovered and saved to Hive');
         } else {
           debugPrint('⚠️ No ONNX models found in filesystem');
+          debugPrint('ℹ️ User needs to download a model from Settings > Model Management');
           return false;
         }
       } else {
-        debugPrint('⚠️ Models directory does not exist');
+        debugPrint('⚠️ Models directory does not exist - no models downloaded yet');
+        debugPrint('ℹ️ User needs to download a model from Settings > Model Management');
         return false;
       }
     }
