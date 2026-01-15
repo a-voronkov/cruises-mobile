@@ -4,7 +4,7 @@ import 'dart:math' show exp;
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:onnxruntime/onnxruntime.dart';
+import 'package:flutter_onnxruntime/flutter_onnxruntime.dart';
 import 'tokenizer_service.dart';
 
 /// Service for local LLM inference using ONNX Runtime
@@ -65,7 +65,7 @@ class LocalInferenceService {
       onProgress?.call(0.4);
 
       // Initialize ONNX Runtime
-      OrtEnv.instance.init();
+      OnnxRuntime.init();
 
       onProgress?.call(0.5);
 
@@ -75,7 +75,7 @@ class LocalInferenceService {
       // Load model
       debugPrint('LocalInferenceService: Creating ONNX session...');
       try {
-        _session = OrtSession.fromFile(modelFile, sessionOptions);
+        _session = OrtSession.fromFile(modelPath, sessionOptions);
       } catch (e) {
         final errorMsg = e.toString();
 
@@ -185,23 +185,26 @@ class LocalInferenceService {
       final inputIds = _tokenizer!.encode(prompt);
       debugPrint('LocalInferenceService: Encoded to ${inputIds.length} tokens');
 
-      // Prepare input tensor
-      final inputTensor = OrtValueTensor.createTensorWithDataList(
-        [inputIds],
+      // Prepare input tensor (convert to Int64List)
+      final inputData = Int64List.fromList(inputIds);
+      final inputTensor = OrtValue.createTensorWithDataList(
+        inputData,
         [1, inputIds.length],
       );
 
       // Prepare position_ids (0, 1, 2, ..., length-1)
       final positionIds = List<int>.generate(inputIds.length, (i) => i);
-      final positionTensor = OrtValueTensor.createTensorWithDataList(
-        [positionIds],
+      final positionData = Int64List.fromList(positionIds);
+      final positionTensor = OrtValue.createTensorWithDataList(
+        positionData,
         [1, inputIds.length],
       );
 
       // Prepare attention_mask (all 1s)
       final attentionMask = List<int>.filled(inputIds.length, 1);
-      final attentionTensor = OrtValueTensor.createTensorWithDataList(
-        [attentionMask],
+      final attentionData = Int64List.fromList(attentionMask);
+      final attentionTensor = OrtValue.createTensorWithDataList(
+        attentionData,
         [1, inputIds.length],
       );
 
@@ -210,7 +213,7 @@ class LocalInferenceService {
       debugPrint('LocalInferenceService: Model expects inputs: $inputNames');
 
       // Build inputs map based on what model expects
-      final inputs = <String, OrtValueTensor>{
+      final inputs = <String, OrtValue>{
         'input_ids': inputTensor,
       };
 
@@ -225,7 +228,11 @@ class LocalInferenceService {
 
       // Get output logits
       final outputTensor = outputs[0];
-      final logits = outputTensor?.value as List<List<List<double>>>?;
+      if (outputTensor == null) {
+        throw Exception('No output from model');
+      }
+
+      final logits = outputTensor.value as List<List<List<double>>>?;
 
       if (logits == null || logits.isEmpty) {
         throw Exception('No output from model');
@@ -249,7 +256,7 @@ class LocalInferenceService {
       if (inputs.containsKey('attention_mask')) {
         inputs['attention_mask']?.release();
       }
-      outputTensor?.release();
+      outputTensor.release();
 
       return generatedText;
     } catch (e, stackTrace) {
