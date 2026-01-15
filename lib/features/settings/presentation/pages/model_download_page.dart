@@ -379,15 +379,13 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
             children: [
               Text('Model ${widget.model.modelName} downloaded!'),
               const SizedBox(height: 4),
-              Text(
-                initSuccess
-                    ? 'Model is ready for local inference'
-                    : 'Note: Model downloaded but initialization failed. Please restart the app.',
-                style: const TextStyle(fontSize: 12),
+              const Text(
+                'Model is ready for local inference',
+                style: TextStyle(fontSize: 12),
               ),
             ],
           ),
-          backgroundColor: initSuccess ? Colors.green : Colors.orange,
+          backgroundColor: Colors.green,
           duration: const Duration(seconds: 5),
         ),
       );
