@@ -106,8 +106,9 @@ class HFModelFile {
   }
 
   /// Get download URL for this file
+  /// Adds ?download=true to force LFS file download instead of pointer
   String getDownloadUrl(String repoId) {
-    return 'https://huggingface.co/$repoId/resolve/main/$path';
+    return 'https://huggingface.co/$repoId/resolve/main/$path?download=true';
   }
 }
 
