@@ -22,14 +22,26 @@ class TokenizerService {
       if (await tokenizerFile.exists()) {
         final content = await tokenizerFile.readAsString();
         _tokenizerConfig = json.decode(content) as Map<String, dynamic>;
-        
+
         // Extract vocabulary
         final model = _tokenizerConfig!['model'] as Map<String, dynamic>?;
         if (model != null && model['vocab'] != null) {
-          _vocab = Map<String, int>.from(model['vocab'] as Map);
-          _reverseVocab = _vocab!.map((key, value) => MapEntry(value, key));
-          
-          debugPrint('TokenizerService: Loaded ${_vocab!.length} tokens');
+          final vocabData = model['vocab'];
+
+          // Handle different vocab formats
+          if (vocabData is Map) {
+            _vocab = Map<String, int>.from(vocabData);
+            _reverseVocab = _vocab!.map((key, value) => MapEntry(value, key));
+            debugPrint('TokenizerService: Loaded ${_vocab!.length} tokens from tokenizer.json (Map format)');
+          } else if (vocabData is List) {
+            // Some models use array format: ["token1", "token2", ...]
+            _vocab = {};
+            for (var i = 0; i < vocabData.length; i++) {
+              _vocab![vocabData[i] as String] = i;
+            }
+            _reverseVocab = _vocab!.map((key, value) => MapEntry(value, key));
+            debugPrint('TokenizerService: Loaded ${_vocab!.length} tokens from tokenizer.json (List format)');
+          }
         }
       }
       
@@ -38,10 +50,22 @@ class TokenizerService {
         final vocabFile = File('$modelDir/vocab.json');
         if (await vocabFile.exists()) {
           final content = await vocabFile.readAsString();
-          _vocab = Map<String, int>.from(json.decode(content) as Map);
-          _reverseVocab = _vocab!.map((key, value) => MapEntry(value, key));
-          
-          debugPrint('TokenizerService: Loaded ${_vocab!.length} tokens from vocab.json');
+          final vocabData = json.decode(content);
+
+          // Handle different vocab formats
+          if (vocabData is Map) {
+            _vocab = Map<String, int>.from(vocabData);
+            _reverseVocab = _vocab!.map((key, value) => MapEntry(value, key));
+            debugPrint('TokenizerService: Loaded ${_vocab!.length} tokens from vocab.json (Map format)');
+          } else if (vocabData is List) {
+            // Some models use array format: ["token1", "token2", ...]
+            _vocab = {};
+            for (var i = 0; i < vocabData.length; i++) {
+              _vocab![vocabData[i] as String] = i;
+            }
+            _reverseVocab = _vocab!.map((key, value) => MapEntry(value, key));
+            debugPrint('TokenizerService: Loaded ${_vocab!.length} tokens from vocab.json (List format)');
+          }
         }
       }
       
