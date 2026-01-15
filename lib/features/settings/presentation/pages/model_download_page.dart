@@ -324,8 +324,10 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
         );
 
         // Save main model info for later initialization
-        if (i == 0) {
+        // Only save the main .onnx file (not _data files or tokenizer files)
+        if (mainModelInfo == null && fileName.endsWith('.onnx') && !fileName.contains('_data')) {
           mainModelInfo = modelInfo;
+          debugPrint('📌 Main model file identified: $fileName');
         }
 
         final success = await downloadService.downloadModel(
