@@ -74,7 +74,26 @@ class LocalInferenceService {
 
       // Load model
       debugPrint('LocalInferenceService: Creating ONNX session...');
-      _session = OrtSession.fromFile(modelFile, sessionOptions);
+      try {
+        _session = OrtSession.fromFile(modelFile, sessionOptions);
+      } catch (e) {
+        final errorMsg = e.toString();
+
+        // Check for IR version mismatch
+        if (errorMsg.contains('Unsupported model IR version')) {
+          debugPrint('❌ Model uses newer ONNX IR version than supported');
+          debugPrint('   Current ONNX Runtime supports IR version up to 9');
+          debugPrint('   This model requires IR version 10 or higher');
+          debugPrint('   Please use a model exported with ONNX opset 13 or lower');
+          throw Exception(
+            'Model incompatible: This model uses ONNX IR version 10, but the app only supports up to version 9. '
+            'Please choose a different model or use a model exported with ONNX opset 13 or lower.'
+          );
+        }
+
+        // Re-throw other errors
+        rethrow;
+      }
 
       onProgress?.call(0.7);
 
