@@ -72,6 +72,32 @@ class HFModelFile {
     return pathLower.contains('/gpu/') || pathLower.contains('gpu-');
   }
 
+  /// Check if this model uses MatMulNBits (quantized INT4/INT8)
+  /// These models are not supported on mobile ONNX Runtime
+  bool get usesMatMulNBits {
+    final pathLower = path.toLowerCase();
+    final fileNameLower = path.split('/').last.toLowerCase();
+
+    // INT4 and INT8 quantized models use MatMulNBits
+    return pathLower.contains('int4') ||
+           pathLower.contains('int8') ||
+           pathLower.contains('awq') ||
+           pathLower.contains('rtn') ||
+           fileNameLower.contains('q4') ||
+           fileNameLower.contains('q8');
+  }
+
+  /// Check if this model is compatible with mobile ONNX Runtime
+  bool get isMobileCompatible {
+    // Must be CPU model (not GPU)
+    if (isGPUModel) return false;
+
+    // Must not use MatMulNBits (no INT4/INT8 quantization)
+    if (usesMatMulNBits) return false;
+
+    return true;
+  }
+
   /// Get quantization type from filename (e.g., "int8", "fp16", "q4")
   String? get quantization {
     final fileName = path.toLowerCase();
@@ -235,6 +261,30 @@ class HuggingFaceModelFilesService {
     }
   }
 
+  /// Check if a model repository has any mobile-compatible ONNX files
+  /// Returns true if at least one FP32/FP16 CPU model is found
+  Future<bool> hasMobileCompatibleModels(String repoId) async {
+    try {
+      final modelFiles = await getModelFiles(repoId: repoId, fileType: 'onnx');
+
+      for (final file in modelFiles) {
+        final fileName = file.path.toLowerCase();
+        if (fileName.endsWith('.onnx') && !fileName.contains('_data')) {
+          if (file.isMobileCompatible) {
+            debugPrint('✅ Found mobile-compatible model: ${file.path}');
+            return true;
+          }
+        }
+      }
+
+      debugPrint('❌ No mobile-compatible models found in $repoId');
+      return false;
+    } catch (e) {
+      debugPrint('Error checking model compatibility for $repoId: $e');
+      return false;
+    }
+  }
+
   /// Get ONNX files grouped by quantization
   ///
   /// Groups main .onnx files with their _data files and fetches real sizes
@@ -247,16 +297,20 @@ class HuggingFaceModelFilesService {
     debugPrint('Found ${tokenizerFiles.length} tokenizer/config files');
 
     // Separate main files and data files
-    // Filter out GPU models as they require MatMulNBits which is not supported on mobile
+    // Filter out incompatible models (GPU, quantized INT4/INT8)
     final mainFiles = <HFModelFile>[];
     final dataFiles = <String, List<HFModelFile>>{};
 
     for (final file in modelFiles) {
       final fileName = file.path.toLowerCase();
 
-      // Skip GPU models - they use MatMulNBits which is not supported on Android
-      if (file.isGPUModel) {
-        debugPrint('⏭️ Skipping GPU model (not supported on mobile): ${file.path}');
+      // Skip models that are not compatible with mobile ONNX Runtime
+      if (!file.isMobileCompatible) {
+        if (file.isGPUModel) {
+          debugPrint('⏭️ Skipping GPU model (not supported on mobile): ${file.path}');
+        } else if (file.usesMatMulNBits) {
+          debugPrint('⏭️ Skipping quantized model (MatMulNBits not supported): ${file.path}');
+        }
         continue;
       }
 

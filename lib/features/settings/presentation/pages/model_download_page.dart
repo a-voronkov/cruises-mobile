@@ -164,9 +164,23 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.warning_amber, size: 64, color: theme.colorScheme.primary),
+              Icon(Icons.warning_amber, size: 64, color: theme.colorScheme.error),
               const SizedBox(height: 16),
-              Text('No ONNX files found', style: theme.textTheme.titleLarge),
+              Text('No compatible models found', style: theme.textTheme.titleLarge),
+              const SizedBox(height: 16),
+              Text(
+                'This model only has GPU or quantized (INT4/INT8) versions, '
+                'which are not supported on mobile devices.\n\n'
+                'Please choose a model with FP32 or FP16 CPU version.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('Back to model list'),
+              ),
             ],
           ),
         ),
