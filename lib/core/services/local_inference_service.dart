@@ -95,6 +95,24 @@ class LocalInferenceService {
         rethrow;
       }
 
+      // Check model inputs to detect encoder-decoder models
+      final inputNames = _session!.inputNames;
+      debugPrint('LocalInferenceService: Model inputs: $inputNames');
+
+      // Check if this is an encoder-decoder model (like T5, BART)
+      if (inputNames.contains('encoder_hidden_states') ||
+          modelPath.contains('decoder_model') ||
+          modelPath.contains('encoder_model')) {
+        debugPrint('❌ Encoder-decoder models (T5, BART, etc.) are not supported');
+        debugPrint('   Please use decoder-only models (GPT, Llama, Phi, etc.)');
+        debugPrint('   Or use HuggingFace cloud API instead');
+        throw Exception(
+          'Encoder-decoder models are not supported. '
+          'This model requires both encoder and decoder components. '
+          'Please use decoder-only models (GPT-like) or HuggingFace cloud API.'
+        );
+      }
+
       onProgress?.call(0.7);
 
       // Initialize tokenizer

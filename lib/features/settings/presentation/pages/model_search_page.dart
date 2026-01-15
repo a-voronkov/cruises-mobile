@@ -192,9 +192,11 @@ class _ModelSearchPageState extends ConsumerState<ModelSearchPage> {
                 const SizedBox(height: 8),
                 Text(
                   'ONNX Model Compatibility:\n'
-                  '• Only FP32/FP16 models supported (no INT4/INT8 quantization)\n'
-                  '• Only CPU models supported (no GPU models)\n'
-                  '• Only ONNX IR version ≤9 supported (opset ≤13)\n'
+                  '• Only decoder-only models (GPT, Llama, Phi)\n'
+                  '• NO encoder-decoder models (T5, BART, etc.)\n'
+                  '• Only FP32/FP16 (no INT4/INT8 quantization)\n'
+                  '• Only CPU models (no GPU models)\n'
+                  '• Only ONNX IR version ≤9 (opset ≤13)\n'
                   '• Most modern models use IR v10+ and are NOT compatible\n\n'
                   'Recommended: Use HuggingFace cloud API instead:\n'
                   '• meta-llama/Llama-3.2-1B-Instruct\n'
