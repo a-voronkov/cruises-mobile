@@ -314,9 +314,15 @@ class ModelDownloadService {
         baseDirectory: BaseDirectory.applicationDocuments,
         updates: Updates.statusAndProgress,
         requiresWiFi: false,
-        retries: 3,
+        retries: 5,
         allowPause: true,
         metaData: modelInfo?.id ?? fileName,
+        // Add headers for HuggingFace compatibility
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Android; Mobile) AppleWebKit/537.36',
+        },
+        // Allow redirects (HuggingFace uses CDN redirects)
+        post: null,
       );
 
       // Store task
@@ -327,12 +333,16 @@ class ModelDownloadService {
       // Track completion
       var isComplete = false;
       var hasFailed = false;
+      var lastProgress = 0.0;
+      var lastProgressTime = DateTime.now();
 
-      // Start download and listen to updates
-      final result = await FileDownloader().download(
+      // Start download and listen to updates with timeout
+      final downloadFuture = FileDownloader().download(
         task,
         onProgress: (progress) {
           // This callback is called for progress updates
+          lastProgress = progress;
+          lastProgressTime = DateTime.now();
           debugPrint('📊 Download progress for $fileName: ${(progress * 100).toStringAsFixed(1)}%');
           onProgress(progress, 'Downloading: ${(progress * 100).toStringAsFixed(0)}%');
         },
@@ -340,6 +350,12 @@ class ModelDownloadService {
           // This callback is called for status changes
           debugPrint('📌 Download status for $fileName: $status');
           switch (status) {
+            case TaskStatus.enqueued:
+              debugPrint('⏳ Download enqueued for $fileName');
+              break;
+            case TaskStatus.running:
+              debugPrint('▶️ Download started for $fileName');
+              break;
             case TaskStatus.complete:
               isComplete = true;
               onProgress(1.0, 'Download complete!');
@@ -353,6 +369,7 @@ class ModelDownloadService {
                 _shouldResumeOnReconnect = true;
                 onProgress(0, 'Waiting for internet connection...');
               } else {
+                debugPrint('❌ Download failed for $fileName');
                 onProgress(0, 'Download failed');
                 _shouldResumeOnReconnect = false;
               }
@@ -366,9 +383,27 @@ class ModelDownloadService {
               onProgress(0, 'Download paused');
               // Don't set resume flag for manual pause
               break;
+            case TaskStatus.notFound:
+              hasFailed = true;
+              debugPrint('❌ File not found (404) for $fileName');
+              onProgress(0, 'File not found');
+              _shouldResumeOnReconnect = false;
+              break;
             default:
+              debugPrint('⚠️ Unknown status: $status for $fileName');
               break;
           }
+        },
+      );
+
+      // Wait for download with timeout (30 minutes for large files)
+      final result = await downloadFuture.timeout(
+        const Duration(minutes: 30),
+        onTimeout: () {
+          debugPrint('⏱️ Download timeout for $fileName after 30 minutes');
+          hasFailed = true;
+          onProgress(0, 'Download timeout');
+          return TaskStatusUpdate(task, TaskStatus.failed);
         },
       );
 
