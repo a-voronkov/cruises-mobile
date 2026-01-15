@@ -303,7 +303,8 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
       ModelInfo? mainModelInfo;
       for (int i = 0; i < allFiles.length; i++) {
         final currentFile = allFiles[i];
-        final fileName = currentFile.path.split('/').last;
+        // Use full path with / replaced by _ to avoid conflicts
+        final fileName = currentFile.path.replaceAll('/', '_');
         final fileSize = currentFile.totalSize;
 
         debugPrint('📥 Starting download ${i + 1}/$totalFiles: $fileName (${fileSize / 1024 / 1024} MB)');
