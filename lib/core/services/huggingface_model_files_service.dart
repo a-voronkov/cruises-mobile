@@ -72,28 +72,10 @@ class HFModelFile {
     return pathLower.contains('/gpu/') || pathLower.contains('gpu-');
   }
 
-  /// Check if this model uses MatMulNBits (quantized INT4/INT8)
-  /// These models are not supported on mobile ONNX Runtime
-  bool get usesMatMulNBits {
-    final pathLower = path.toLowerCase();
-    final fileNameLower = path.split('/').last.toLowerCase();
-
-    // INT4 and INT8 quantized models use MatMulNBits
-    return pathLower.contains('int4') ||
-           pathLower.contains('int8') ||
-           pathLower.contains('awq') ||
-           pathLower.contains('rtn') ||
-           fileNameLower.contains('q4') ||
-           fileNameLower.contains('q8');
-  }
-
   /// Check if this model is compatible with mobile ONNX Runtime
   bool get isMobileCompatible {
     // Must be CPU model (not GPU)
     if (isGPUModel) return false;
-
-    // Must not use MatMulNBits (no INT4/INT8 quantization)
-    if (usesMatMulNBits) return false;
 
     return true;
   }
@@ -297,7 +279,7 @@ class HuggingFaceModelFilesService {
     debugPrint('Found ${tokenizerFiles.length} tokenizer/config files');
 
     // Separate main files and data files
-    // Filter out incompatible models (GPU, quantized INT4/INT8)
+    // Filter out incompatible models (GPU only)
     final mainFiles = <HFModelFile>[];
     final dataFiles = <String, List<HFModelFile>>{};
 
@@ -308,8 +290,6 @@ class HuggingFaceModelFilesService {
       if (!file.isMobileCompatible) {
         if (file.isGPUModel) {
           debugPrint('⏭️ Skipping GPU model (not supported on mobile): ${file.path}');
-        } else if (file.usesMatMulNBits) {
-          debugPrint('⏭️ Skipping quantized model (MatMulNBits not supported): ${file.path}');
         }
         continue;
       }
