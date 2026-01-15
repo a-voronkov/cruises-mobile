@@ -6,6 +6,7 @@ import '../../../../core/services/huggingface_model_files_service.dart';
 import '../../../../core/services/ai_service_provider.dart';
 import '../../../../core/models/model_info.dart';
 import '../../../../core/config/api_config.dart';
+import '../../../../core/providers/model_status_provider.dart';
 
 /// Provider for model files service
 final modelFilesServiceProvider = Provider<HuggingFaceModelFilesService>((ref) {
@@ -400,12 +401,15 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
             ],
           ),
           backgroundColor: Colors.green,
-          duration: const Duration(seconds: 5),
+          duration: const Duration(seconds: 3),
         ),
       );
 
-      // Go back to settings
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      // Invalidate model status to trigger navigation to chat
+      ref.invalidate(modelStatusProvider);
+
+      // Navigate to chat page (via AppInitializer)
+      Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
     } catch (e) {
       if (!mounted) return;
 
