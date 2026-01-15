@@ -420,20 +420,43 @@ class ModelDownloadService {
 
           debugPrint('📁 File exists: $modelPath (${fileSize} bytes)');
 
+          // Check if file is a Git LFS pointer
+          bool isLfsPointer = false;
+          if (fileSize < 200) {
+            try {
+              final content = file.readAsStringSync();
+              if (content.startsWith('version https://git-lfs.github.com')) {
+                isLfsPointer = true;
+                debugPrint('⚠️ Downloaded Git LFS pointer instead of actual file!');
+                debugPrint('Content: $content');
+              }
+            } catch (e) {
+              debugPrint('Could not read file to check for LFS pointer: $e');
+            }
+          }
+
           // Check file size based on file type
           bool isValidSize = false;
-          if (fileNameLower.endsWith('.onnx') || fileNameLower.endsWith('.gguf')) {
-            // Model files should be > 100MB
-            isValidSize = fileSize > 100 * 1024 * 1024;
+          if (isLfsPointer) {
+            // LFS pointer file - this is an error
+            isValidSize = false;
+            debugPrint('❌ File is a Git LFS pointer, not the actual file');
+          } else if (fileNameLower.endsWith('.onnx') || fileNameLower.endsWith('.gguf')) {
+            // Main model files should be > 100MB
+            // But some auxiliary ONNX files (embedding, speech, vision) might be smaller
+            // Accept files > 1KB as valid (to allow small auxiliary files)
+            isValidSize = fileSize > 1024;
             if (!isValidSize) {
               debugPrint('❌ Model file too small: ${fileSize / 1024 / 1024} MB');
+            } else if (fileSize > 100 * 1024 * 1024) {
+              debugPrint('✅ Large model file size OK: ${fileSize / 1024 / 1024} MB');
             } else {
-              debugPrint('✅ Model file size OK: ${fileSize / 1024 / 1024} MB');
+              debugPrint('✅ Small model file size OK: ${fileSize / 1024 / 1024} MB (auxiliary file)');
             }
           } else {
             // Tokenizer and config files just need to have content
             isValidSize = fileSize > 0;
-            debugPrint('✅ Small file detected (${fileSize} bytes): $fileName - this is OK for tokenizer/config files');
+            debugPrint('✅ Config file detected (${fileSize} bytes): $fileName');
           }
 
           if (isValidSize) {
