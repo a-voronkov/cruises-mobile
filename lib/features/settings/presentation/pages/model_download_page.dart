@@ -290,6 +290,10 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
       var downloadedBytes = 0;
 
       debugPrint('📦 Total files: $totalFiles, Total size: ${totalBytes / 1024 / 1024} MB');
+      debugPrint('📋 Files list:');
+      for (var f in allFiles) {
+        debugPrint('   - ${f.path} (${f.totalSize / 1024 / 1024} MB)');
+      }
 
       setState(() {
         _downloadStatus = 'Downloading $totalFiles file${totalFiles > 1 ? 's' : ''}...';
