@@ -60,6 +60,18 @@ class HFModelFile {
     return total;
   }
 
+  /// Check if this is a CPU-optimized model
+  bool get isCPUModel {
+    final pathLower = path.toLowerCase();
+    return pathLower.contains('/cpu/') || pathLower.contains('cpu-');
+  }
+
+  /// Check if this is a GPU-optimized model
+  bool get isGPUModel {
+    final pathLower = path.toLowerCase();
+    return pathLower.contains('/gpu/') || pathLower.contains('gpu-');
+  }
+
   /// Get quantization type from filename (e.g., "int8", "fp16", "q4")
   String? get quantization {
     final fileName = path.toLowerCase();
@@ -235,11 +247,19 @@ class HuggingFaceModelFilesService {
     debugPrint('Found ${tokenizerFiles.length} tokenizer/config files');
 
     // Separate main files and data files
+    // Filter out GPU models as they require MatMulNBits which is not supported on mobile
     final mainFiles = <HFModelFile>[];
     final dataFiles = <String, List<HFModelFile>>{};
 
     for (final file in modelFiles) {
       final fileName = file.path.toLowerCase();
+
+      // Skip GPU models - they use MatMulNBits which is not supported on Android
+      if (file.isGPUModel) {
+        debugPrint('⏭️ Skipping GPU model (not supported on mobile): ${file.path}');
+        continue;
+      }
+
       if (fileName.endsWith('.onnx') && !fileName.contains('_data')) {
         mainFiles.add(file);
       } else if (fileName.contains('_data')) {
