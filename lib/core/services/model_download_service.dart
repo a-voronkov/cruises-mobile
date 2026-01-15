@@ -533,6 +533,31 @@ class ModelDownloadService {
     return deleteModelFile(currentModelFileName);
   }
 
+  /// Delete all downloaded models and related files
+  Future<bool> deleteAllModels() async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final modelsDir = Directory('${directory.path}/models');
+
+      if (modelsDir.existsSync()) {
+        debugPrint('Deleting all models from: ${modelsDir.path}');
+        modelsDir.deleteSync(recursive: true);
+
+        // Clear selected model
+        await clearSelectedModel();
+
+        debugPrint('All models deleted successfully');
+        return true;
+      }
+
+      debugPrint('Models directory does not exist');
+      return false;
+    } catch (e) {
+      debugPrint('Error deleting all models: $e');
+      return false;
+    }
+  }
+
   /// Delete a specific model file
   Future<bool> deleteModelFile(String fileName) async {
     try {

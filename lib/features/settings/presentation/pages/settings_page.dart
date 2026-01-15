@@ -179,10 +179,10 @@ class SettingsPage extends ConsumerWidget {
     return ListTile(
       leading: Icon(Icons.delete_sweep_outlined, color: Theme.of(context).colorScheme.error),
       title: Text(
-        'Delete model',
+        'Delete all models',
         style: TextStyle(color: Theme.of(context).colorScheme.error),
       ),
-      subtitle: const Text('Remove the AI model to free up space'),
+      subtitle: const Text('Remove all downloaded AI models to free up space'),
       onTap: () => _showDeleteModelDialog(context, ref),
     );
   }
@@ -191,10 +191,10 @@ class SettingsPage extends ConsumerWidget {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete model?'),
+        title: const Text('Delete all models?'),
         content: const Text(
-          'This will delete the AI model (~700 MB). '
-          'You will need to download it again to use the chat feature.',
+          'This will delete ALL downloaded AI models and related files. '
+          'You will need to download them again to use the chat feature.',
         ),
         actions: [
           TextButton(
@@ -208,12 +208,12 @@ class SettingsPage extends ConsumerWidget {
             onPressed: () async {
               Navigator.pop(context);
               final service = ref.read(modelDownloadServiceProvider);
-              final deleted = await service.deleteModel();
+              final deleted = await service.deleteAllModels();
               ref.invalidate(modelStatusProvider);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(deleted ? 'Model deleted' : 'Failed to delete model'),
+                    content: Text(deleted ? 'All models deleted' : 'Failed to delete models'),
                   ),
                 );
               }
