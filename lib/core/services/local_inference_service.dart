@@ -191,8 +191,36 @@ class LocalInferenceService {
         [1, inputIds.length],
       );
 
-      // Run inference
-      final inputs = {'input_ids': inputTensor};
+      // Prepare position_ids (0, 1, 2, ..., length-1)
+      final positionIds = List<int>.generate(inputIds.length, (i) => i);
+      final positionTensor = OrtValueTensor.createTensorWithDataList(
+        [positionIds],
+        [1, inputIds.length],
+      );
+
+      // Prepare attention_mask (all 1s)
+      final attentionMask = List<int>.filled(inputIds.length, 1);
+      final attentionTensor = OrtValueTensor.createTensorWithDataList(
+        [attentionMask],
+        [1, inputIds.length],
+      );
+
+      // Check what inputs the model expects
+      final inputNames = _session!.inputNames;
+      debugPrint('LocalInferenceService: Model expects inputs: $inputNames');
+
+      // Build inputs map based on what model expects
+      final inputs = <String, OrtValueTensor>{
+        'input_ids': inputTensor,
+      };
+
+      if (inputNames.contains('position_ids')) {
+        inputs['position_ids'] = positionTensor;
+      }
+
+      if (inputNames.contains('attention_mask')) {
+        inputs['attention_mask'] = attentionTensor;
+      }
       final outputs = _session!.run(OrtRunOptions(), inputs);
 
       // Get output logits
@@ -215,6 +243,12 @@ class LocalInferenceService {
 
       // Clean up
       inputTensor.release();
+      if (inputs.containsKey('position_ids')) {
+        inputs['position_ids']?.release();
+      }
+      if (inputs.containsKey('attention_mask')) {
+        inputs['attention_mask']?.release();
+      }
       outputTensor?.release();
 
       return generatedText;

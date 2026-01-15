@@ -56,9 +56,18 @@ class AIService {
     void Function(double progress)? onProgress,
   }) async {
     try {
-      if (_isInitialized && !_isDisposed) {
-        debugPrint('AIService: Already initialized');
+      // Check if already initialized with the same model
+      if (_isInitialized && !_isDisposed &&
+          _currentModelId == modelId &&
+          _currentModelFileName == modelFileName) {
+        debugPrint('AIService: Already initialized with same model');
         return true;
+      }
+
+      // If different model, dispose old one first
+      if (_isInitialized && !_isDisposed) {
+        debugPrint('AIService: Switching to new model, disposing old one');
+        dispose();
       }
 
       // Reset disposed flag if reinitializing
