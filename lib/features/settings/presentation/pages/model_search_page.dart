@@ -194,7 +194,7 @@ class _ModelSearchPageState extends ConsumerState<ModelSearchPage> {
                   'ONNX Model Compatibility:\n'
                   '• Only decoder-only models (GPT, Llama, Phi)\n'
                   '• NO encoder-decoder models (T5, BART, etc.)\n'
-                  '• Only FP32/FP16 (no INT4/INT8 quantization)\n'
+                  '• Supports FP32/FP16/INT8/INT4 quantization ✓\n'
                   '• Only CPU models (no GPU models)\n'
                   '• Only ONNX IR version ≤9 (opset ≤13)\n'
                   '• Most modern models use IR v10+ and are NOT compatible\n\n'
