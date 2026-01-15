@@ -37,7 +37,16 @@ class TokenizerService {
             // Some models use array format: ["token1", "token2", ...]
             _vocab = {};
             for (var i = 0; i < vocabData.length; i++) {
-              _vocab![vocabData[i] as String] = i;
+              final item = vocabData[i];
+              if (item is String) {
+                _vocab![item] = i;
+              } else if (item is List && item.isNotEmpty) {
+                // Some tokenizers use [token, id] format
+                _vocab![item[0].toString()] = item.length > 1 ? item[1] as int : i;
+              } else {
+                // Fallback: convert to string
+                _vocab![item.toString()] = i;
+              }
             }
             _reverseVocab = _vocab!.map((key, value) => MapEntry(value, key));
             debugPrint('TokenizerService: Loaded ${_vocab!.length} tokens from tokenizer.json (List format)');
@@ -61,7 +70,16 @@ class TokenizerService {
             // Some models use array format: ["token1", "token2", ...]
             _vocab = {};
             for (var i = 0; i < vocabData.length; i++) {
-              _vocab![vocabData[i] as String] = i;
+              final item = vocabData[i];
+              if (item is String) {
+                _vocab![item] = i;
+              } else if (item is List && item.isNotEmpty) {
+                // Some tokenizers use [token, id] format
+                _vocab![item[0].toString()] = item.length > 1 ? item[1] as int : i;
+              } else {
+                // Fallback: convert to string
+                _vocab![item.toString()] = i;
+              }
             }
             _reverseVocab = _vocab!.map((key, value) => MapEntry(value, key));
             debugPrint('TokenizerService: Loaded ${_vocab!.length} tokens from vocab.json (List format)');
