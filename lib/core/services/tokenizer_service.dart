@@ -30,7 +30,11 @@ class TokenizerService {
 
           // Handle different vocab formats
           if (vocabData is Map) {
-            _vocab = Map<String, int>.from(vocabData);
+            _vocab = {};
+            vocabData.forEach((key, value) {
+              final tokenId = value is int ? value : (value as num).toInt();
+              _vocab![key.toString()] = tokenId;
+            });
             _reverseVocab = _vocab!.map((key, value) => MapEntry(value, key));
             debugPrint('TokenizerService: Loaded ${_vocab!.length} tokens from tokenizer.json (Map format)');
           } else if (vocabData is List) {
@@ -42,7 +46,10 @@ class TokenizerService {
                 _vocab![item] = i;
               } else if (item is List && item.isNotEmpty) {
                 // Some tokenizers use [token, id] format
-                _vocab![item[0].toString()] = item.length > 1 ? item[1] as int : i;
+                final tokenId = item.length > 1
+                    ? (item[1] is int ? item[1] as int : (item[1] as num).toInt())
+                    : i;
+                _vocab![item[0].toString()] = tokenId;
               } else {
                 // Fallback: convert to string
                 _vocab![item.toString()] = i;
@@ -63,7 +70,11 @@ class TokenizerService {
 
           // Handle different vocab formats
           if (vocabData is Map) {
-            _vocab = Map<String, int>.from(vocabData);
+            _vocab = {};
+            vocabData.forEach((key, value) {
+              final tokenId = value is int ? value : (value as num).toInt();
+              _vocab![key.toString()] = tokenId;
+            });
             _reverseVocab = _vocab!.map((key, value) => MapEntry(value, key));
             debugPrint('TokenizerService: Loaded ${_vocab!.length} tokens from vocab.json (Map format)');
           } else if (vocabData is List) {
@@ -75,7 +86,10 @@ class TokenizerService {
                 _vocab![item] = i;
               } else if (item is List && item.isNotEmpty) {
                 // Some tokenizers use [token, id] format
-                _vocab![item[0].toString()] = item.length > 1 ? item[1] as int : i;
+                final tokenId = item.length > 1
+                    ? (item[1] is int ? item[1] as int : (item[1] as num).toInt())
+                    : i;
+                _vocab![item[0].toString()] = tokenId;
               } else {
                 // Fallback: convert to string
                 _vocab![item.toString()] = i;
