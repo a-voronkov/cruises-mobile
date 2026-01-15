@@ -11,6 +11,7 @@ import 'tokenizer_service.dart';
 ///
 /// Provides text generation using ONNX models with tokenizer support
 class LocalInferenceService {
+  OnnxRuntime? _ort;
   OrtSession? _session;
   TokenizerService? _tokenizer;
   bool _isInitialized = false;
@@ -65,7 +66,7 @@ class LocalInferenceService {
       onProgress?.call(0.4);
 
       // Initialize ONNX Runtime
-      OnnxRuntime.init();
+      _ort = OnnxRuntime();
 
       onProgress?.call(0.5);
 
@@ -75,7 +76,7 @@ class LocalInferenceService {
       // Load model
       debugPrint('LocalInferenceService: Creating ONNX session...');
       try {
-        _session = OrtSession.fromFile(modelPath, sessionOptions);
+        _session = await _ort!.createSession(modelPath, options: sessionOptions);
       } catch (e) {
         final errorMsg = e.toString();
 
@@ -187,7 +188,7 @@ class LocalInferenceService {
 
       // Prepare input tensor (convert to Int64List)
       final inputData = Int64List.fromList(inputIds);
-      final inputTensor = OrtValue.createTensorWithDataList(
+      final inputTensor = await OrtValue.fromList(
         inputData,
         [1, inputIds.length],
       );
@@ -195,7 +196,7 @@ class LocalInferenceService {
       // Prepare position_ids (0, 1, 2, ..., length-1)
       final positionIds = List<int>.generate(inputIds.length, (i) => i);
       final positionData = Int64List.fromList(positionIds);
-      final positionTensor = OrtValue.createTensorWithDataList(
+      final positionTensor = await OrtValue.fromList(
         positionData,
         [1, inputIds.length],
       );
@@ -203,7 +204,7 @@ class LocalInferenceService {
       // Prepare attention_mask (all 1s)
       final attentionMask = List<int>.filled(inputIds.length, 1);
       final attentionData = Int64List.fromList(attentionMask);
-      final attentionTensor = OrtValue.createTensorWithDataList(
+      final attentionTensor = await OrtValue.fromList(
         attentionData,
         [1, inputIds.length],
       );
@@ -224,22 +225,23 @@ class LocalInferenceService {
       if (inputNames.contains('attention_mask')) {
         inputs['attention_mask'] = attentionTensor;
       }
-      final outputs = _session!.run(OrtRunOptions(), inputs);
+      final outputs = await _session!.run(inputs);
 
-      // Get output logits
-      final outputTensor = outputs[0];
+      // Get output logits (outputs is a Map<String, OrtValue>)
+      final outputName = _session!.outputNames.first;
+      final outputTensor = outputs[outputName];
       if (outputTensor == null) {
         throw Exception('No output from model');
       }
 
-      final logits = outputTensor.value as List<List<List<double>>>?;
+      final logits = await outputTensor.asList() as List<List<List<dynamic>>>;
 
-      if (logits == null || logits.isEmpty) {
+      if (logits.isEmpty) {
         throw Exception('No output from model');
       }
 
       // Get last token logits and sample next token
-      final lastLogits = logits[0].last;
+      final lastLogits = (logits[0].last as List).cast<double>();
       final nextTokenId = _sampleToken(lastLogits, temperature, topP);
 
       // Decode output
@@ -249,14 +251,14 @@ class LocalInferenceService {
       debugPrint('LocalInferenceService: Generated ${outputIds.length} tokens');
 
       // Clean up
-      inputTensor.release();
+      await inputTensor.dispose();
       if (inputs.containsKey('position_ids')) {
-        inputs['position_ids']?.release();
+        await inputs['position_ids']?.dispose();
       }
       if (inputs.containsKey('attention_mask')) {
-        inputs['attention_mask']?.release();
+        await inputs['attention_mask']?.dispose();
       }
-      outputTensor.release();
+      await outputTensor.dispose();
 
       return generatedText;
     } catch (e, stackTrace) {
@@ -329,9 +331,10 @@ class LocalInferenceService {
   }
 
   /// Dispose the service and free resources
-  void dispose() {
-    _session?.release();
+  Future<void> dispose() async {
+    await _session?.close();
     _session = null;
+    _ort = null;
     _tokenizer?.dispose();
     _tokenizer = null;
     _isInitialized = false;
