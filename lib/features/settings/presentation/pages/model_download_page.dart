@@ -336,10 +336,12 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
             final totalDownloaded = downloadedBytes + currentFileBytes;
             final overallProgress = totalBytes > 0 ? totalDownloaded / totalBytes : 0.0;
 
-            setState(() {
-              _downloadProgress = overallProgress;
-              _downloadStatus = 'File ${i + 1}/$totalFiles: $status (${(overallProgress * 100).toStringAsFixed(1)}% total)';
-            });
+            if (mounted) {
+              setState(() {
+                _downloadProgress = overallProgress;
+                _downloadStatus = 'File ${i + 1}/$totalFiles: $status (${(overallProgress * 100).toStringAsFixed(1)}% total)';
+              });
+            }
           },
         );
 

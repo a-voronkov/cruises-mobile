@@ -337,6 +337,7 @@ class ModelDownloadService {
       var lastProgressTime = DateTime.now();
 
       // Start download and listen to updates with timeout
+      debugPrint('🚀 Calling FileDownloader().download() for $fileName');
       final downloadFuture = FileDownloader().download(
         task,
         onProgress: (progress) {
@@ -348,6 +349,7 @@ class ModelDownloadService {
         },
         onStatus: (status) {
           // This callback is called for status changes
+          debugPrint('📡 Download status for $fileName: $status');
           debugPrint('📌 Download status for $fileName: $status');
           switch (status) {
             case TaskStatus.enqueued:

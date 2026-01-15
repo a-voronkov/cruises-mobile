@@ -20,16 +20,16 @@ class NetworkMonitorService {
   /// Initialize network monitoring
   Future<void> initialize() async {
     // Check initial connectivity
-    final result = await _connectivity.checkConnectivity();
-    _isConnected = _hasInternetConnection(result);
-    
+    final results = await _connectivity.checkConnectivity();
+    _isConnected = _hasInternetConnection(results);
+
     debugPrint('NetworkMonitor: Initial connectivity: $_isConnected');
-    
+
     // Listen to connectivity changes
     _subscription = _connectivity.onConnectivityChanged.listen((results) {
       final wasConnected = _isConnected;
       _isConnected = _hasInternetConnection(results);
-      
+
       if (wasConnected != _isConnected) {
         debugPrint('NetworkMonitor: Connectivity changed: $_isConnected');
         _connectivityController.add(_isConnected);
