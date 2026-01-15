@@ -36,10 +36,10 @@ class NetworkMonitorService {
       }
     });
   }
-  
+
   /// Check if connectivity result indicates internet connection
   bool _hasInternetConnection(List<ConnectivityResult> results) {
-    return results.any((result) => 
+    return results.any((result) =>
       result == ConnectivityResult.mobile ||
       result == ConnectivityResult.wifi ||
       result == ConnectivityResult.ethernet
