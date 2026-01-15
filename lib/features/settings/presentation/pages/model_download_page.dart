@@ -303,8 +303,8 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
       ModelInfo? mainModelInfo;
       for (int i = 0; i < allFiles.length; i++) {
         final currentFile = allFiles[i];
-        // Use full path with / replaced by _ to avoid conflicts
-        final fileName = currentFile.path.replaceAll('/', '_');
+        // Use full path to preserve directory structure
+        final fileName = currentFile.path;
         final fileSize = currentFile.totalSize;
 
         debugPrint('📥 Starting download ${i + 1}/$totalFiles: $fileName (${fileSize / 1024 / 1024} MB)');
@@ -330,7 +330,11 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
 
         // Save main model info for later initialization
         // Only save the main .onnx file (not _data files or tokenizer files)
-        if (mainModelInfo == null && fileName.endsWith('.onnx') && !fileName.contains('_data')) {
+        // Check if this is a model file (not tokenizer) by looking at the path
+        final isModelFile = fileName.endsWith('.onnx') &&
+                           !fileName.contains('_data') &&
+                           !fileName.contains('tokenizer');
+        if (mainModelInfo == null && isModelFile) {
           mainModelInfo = modelInfo;
           debugPrint('📌 Main model file identified: $fileName');
         }

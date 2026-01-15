@@ -219,7 +219,14 @@ class ModelDownloadService {
         modelsDir.createSync(recursive: true);
       }
 
-      return '${modelsDir.path}/$fileName';
+      // If fileName contains path separators, create subdirectories
+      final filePath = '${modelsDir.path}/$fileName';
+      final fileDir = File(filePath).parent;
+      if (!fileDir.existsSync()) {
+        fileDir.createSync(recursive: true);
+      }
+
+      return filePath;
     } catch (e) {
       debugPrint('Error getting model path: $e');
       return null;
@@ -299,18 +306,27 @@ class ModelDownloadService {
 
       // Get directory for download
       final directory = await getApplicationDocumentsDirectory();
-      final modelsDir = Directory('${directory.path}/models');
-      if (!modelsDir.existsSync()) {
-        modelsDir.createSync(recursive: true);
+
+      // Split fileName into directory and actual filename
+      // e.g., "onnx/model_q4.onnx" -> directory: "models/onnx", filename: "model_q4.onnx"
+      final pathParts = fileName.split('/');
+      final actualFileName = pathParts.last;
+      final subDir = pathParts.length > 1 ? pathParts.sublist(0, pathParts.length - 1).join('/') : '';
+      final downloadDir = subDir.isEmpty ? 'models' : 'models/$subDir';
+
+      // Create directory structure
+      final fullDir = Directory('${directory.path}/$downloadDir');
+      if (!fullDir.existsSync()) {
+        fullDir.createSync(recursive: true);
       }
 
       // Create download task with unique taskId
-      final taskId = '${fileName}_${DateTime.now().millisecondsSinceEpoch}';
+      final taskId = '${fileName.replaceAll('/', '_')}_${DateTime.now().millisecondsSinceEpoch}';
       final task = DownloadTask(
         taskId: taskId,
         url: downloadUrl,
-        filename: fileName,
-        directory: 'models',
+        filename: actualFileName,
+        directory: downloadDir,
         baseDirectory: BaseDirectory.applicationDocuments,
         updates: Updates.statusAndProgress,
         requiresWiFi: false,
