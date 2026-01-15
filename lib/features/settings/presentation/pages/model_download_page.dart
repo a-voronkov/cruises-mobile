@@ -373,6 +373,8 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
         });
 
         debugPrint('🔧 Initializing AI service with model: ${mainModelInfo.id}');
+        debugPrint('   Model fileName: ${mainModelInfo.fileName}');
+        debugPrint('   Model huggingFaceRepo: ${mainModelInfo.huggingFaceRepo}');
 
         // Use selectModel to save and initialize
         await downloadService.selectModel(mainModelInfo);
