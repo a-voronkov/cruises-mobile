@@ -270,16 +270,24 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
       final totalFiles = 1 + file.relatedFiles.length;
       final allFiles = [file, ...file.relatedFiles];
 
+      // Calculate total size for progress calculation
+      final totalBytes = allFiles.fold<int>(0, (sum, f) => sum + f.totalSize);
+      var downloadedBytes = 0;
+
+      debugPrint('📦 Total files: $totalFiles, Total size: ${totalBytes / 1024 / 1024} MB');
+
       setState(() {
         _downloadStatus = 'Downloading $totalFiles file${totalFiles > 1 ? 's' : ''}...';
       });
 
       // Download all files sequentially
+      ModelInfo? mainModelInfo;
       for (int i = 0; i < allFiles.length; i++) {
         final currentFile = allFiles[i];
         final fileName = currentFile.path.split('/').last;
+        final fileSize = currentFile.totalSize;
 
-        debugPrint('📥 Starting download ${i + 1}/$totalFiles: $fileName');
+        debugPrint('📥 Starting download ${i + 1}/$totalFiles: $fileName (${fileSize / 1024 / 1024} MB)');
 
         setState(() {
           _downloadStatus = 'Downloading ${i + 1}/$totalFiles: $fileName';
@@ -300,14 +308,22 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
           downloadUrl: currentFile.getDownloadUrl(widget.model.id),
         );
 
+        // Save main model info for later initialization
+        if (i == 0) {
+          mainModelInfo = modelInfo;
+        }
+
         final success = await downloadService.downloadModel(
           modelInfo: modelInfo,
           onProgress: (progress, status) {
-            // Calculate overall progress
-            final fileProgress = (i + progress) / totalFiles;
+            // Calculate overall progress based on bytes downloaded
+            final currentFileBytes = (fileSize * progress).toInt();
+            final totalDownloaded = downloadedBytes + currentFileBytes;
+            final overallProgress = totalBytes > 0 ? totalDownloaded / totalBytes : 0.0;
+
             setState(() {
-              _downloadProgress = fileProgress;
-              _downloadStatus = 'File ${i + 1}/$totalFiles: $status';
+              _downloadProgress = overallProgress;
+              _downloadStatus = 'File ${i + 1}/$totalFiles: $status (${(overallProgress * 100).toStringAsFixed(1)}% total)';
             });
           },
         );
@@ -317,7 +333,9 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
           throw Exception('Failed to download $fileName');
         }
 
-        debugPrint('✅ Successfully downloaded ${i + 1}/$totalFiles: $fileName');
+        // Update downloaded bytes counter
+        downloadedBytes += fileSize;
+        debugPrint('✅ Successfully downloaded ${i + 1}/$totalFiles: $fileName (${downloadedBytes / 1024 / 1024} / ${totalBytes / 1024 / 1024} MB)');
 
         // Small delay between downloads to let background downloader clean up
         if (i < allFiles.length - 1) {
@@ -330,29 +348,25 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
 
       if (!mounted) return;
 
-      // Reinitialize AI service with the new model
-      // Use the main file (first in the list) as the model file
-      final mainFileName = file.path.split('/').last;
-      debugPrint('Reinitializing AI service with new model: ${widget.model.id} (file: $mainFileName)');
-      final aiService = ref.read(aiServiceProvider);
-      final initSuccess = await aiService.initialize(
-        modelId: widget.model.id,
-        modelFileName: mainFileName,
-        onProgress: (progress) {
-          debugPrint('AI service init progress: ${(progress * 100).toStringAsFixed(0)}%');
-        },
-      );
+      // Now initialize AI service with the main model (after all files are downloaded)
+      if (mainModelInfo != null) {
+        setState(() {
+          _downloadStatus = 'Initializing model...';
+          _downloadProgress = 1.0;
+        });
 
-      if (initSuccess) {
-        debugPrint('✅ AI service reinitialized successfully');
+        debugPrint('🔧 Initializing AI service with model: ${mainModelInfo.id}');
+
+        // Use selectModel to save and initialize
+        await downloadService.selectModel(mainModelInfo);
+
+        // Invalidate AI service state to refresh UI
+        ref.invalidate(aiServiceInitializerProvider);
+
+        debugPrint('✅ Model initialized and saved: ${mainModelInfo.id}');
       } else {
-        debugPrint('⚠️ AI service reinitialization failed');
+        debugPrint('⚠️ No main model info found for initialization');
       }
-
-      // Invalidate AI service state to refresh UI
-      ref.invalidate(aiServiceInitializerProvider);
-
-      debugPrint('Model saved to preferences: ${widget.model.id}');
 
       if (!mounted) return;
 

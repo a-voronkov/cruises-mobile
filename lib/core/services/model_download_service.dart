@@ -437,10 +437,18 @@ class ModelDownloadService {
           }
 
           if (isValidSize) {
-            // Update selected model on successful download (only for main model files)
+            // Don't initialize AI service here - wait until all files are downloaded
+            // Just save the model info for later
             if (modelInfo != null && (fileNameLower.endsWith('.onnx') || fileNameLower.endsWith('.gguf'))) {
-              debugPrint('💾 Selecting model: ${modelInfo.id}');
-              await selectModel(modelInfo);
+              debugPrint('💾 Saving model info: ${modelInfo.id}');
+              _selectedModel = modelInfo;
+              _selectedModelFileName = fileName;
+              try {
+                await HiveService.settingsBox.put(AppConstants.modelStorageKey, modelInfo.toJson());
+                debugPrint('ModelDownloadService: Model info saved (without initialization): ${modelInfo.id}');
+              } catch (e) {
+                debugPrint('ModelDownloadService: failed to save model: $e');
+              }
             }
             _currentTask = null;
             debugPrint('✅ Download verified successfully for $fileName');

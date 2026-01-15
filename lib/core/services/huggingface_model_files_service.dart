@@ -330,9 +330,7 @@ class HuggingFaceModelFilesService {
       // For small files (< 10 MB), they might be:
       // 1. Git LFS pointer files (need to fetch real size)
       // 2. Actually small files (config, tokenizer, etc.)
-      // We'll just keep the size from LFS API and mark them as potentially incomplete
-
-      debugPrint('⚠ Small file detected: ${file.path} (${file.formattedSize}) - keeping LFS size');
+      // We'll just keep the size from LFS API
       // Don't try to fetch size for small files - it's unreliable and slow
 
     } catch (e) {
